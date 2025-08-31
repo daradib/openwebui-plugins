@@ -4,18 +4,28 @@ author: daradib
 author_url: https://github.com/daradib
 git_url: https://github.com/daradib/openwebui-plugins.git
 description: Search the web using Perplexity AI via OpenRouter API.
-version: 0.1.0
+version: 0.1.1
 license: MIT
 """
 # This is ported from the Perplexity Web Search Tool:
 # https://openwebui.com/t/abhiactually/perplexity
 
 import json
+import re
 from typing import Optional, Callable, Any, Dict
 
 import aiohttp
 from aiohttp import ClientTimeout
 from pydantic import BaseModel, Field
+
+
+CITATION_PATTERN = re.compile(r"\[\d+\]")
+
+
+def clean(s: str) -> str:
+    """Remove citations from string."""
+    # Workaround for https://github.com/open-webui/open-webui/issues/17062
+    return CITATION_PATTERN.sub("", s)
 
 
 class Tools:
@@ -188,7 +198,7 @@ class Tools:
             for url in citations:
                 response_text += f"- {url}\n"
 
-            return response_text
+            return clean(response_text)
 
         except Exception as e:
             error_msg = f"Error performing web search: {str(e)}"

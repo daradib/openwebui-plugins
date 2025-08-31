@@ -5,15 +5,25 @@ author_url: https://github.com/daradib/
 git_url: https://github.com/daradib/openwebui-plugins.git
 description: Search the web using the Linkup API. Provides real-time web search capabilities with citations.
 requirements: linkup-sdk
-version: 0.1.0
+version: 0.1.1
 license: BSD-3
 """
 
 import json
+import re
 from typing import Any, Callable, Dict, Literal, Optional
 
 from linkup import LinkupClient
 from pydantic import BaseModel, Field
+
+
+CITATION_PATTERN = re.compile(r"\[\d+\]")
+
+
+def clean(s: str) -> str:
+    """Remove citations from string."""
+    # Workaround for https://github.com/open-webui/open-webui/issues/17062
+    return CITATION_PATTERN.sub("", s)
 
 
 class Tools:
@@ -137,7 +147,7 @@ class Tools:
                     "answer": answer,
                     "sources": [source.dict(exclude={"snippet"}) for source in sources],
                 }
-                return json.dumps(answer_with_sources, ensure_ascii=False)
+                return clean(json.dumps(answer_with_sources, ensure_ascii=False))
 
             elif self.valves.output_type == "searchResults":
                 results = getattr(response, "results", [])
@@ -167,7 +177,7 @@ class Tools:
 
                 await emit_status("Search completed successfully", done=True)
 
-                return str(response)
+                return clean(str(response))
 
             else:
                 raise NotImplementedError
