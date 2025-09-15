@@ -5,13 +5,14 @@ author_url: https://github.com/daradib/
 git_url: https://github.com/daradib/openwebui-plugins.git
 description: Search the web using the Linkup API. Provides real-time web search capabilities with citations.
 requirements: linkup-sdk
-version: 0.1.1
+version: 0.1.2
 license: BSD-3
 """
 
+from datetime import date
 import json
 import re
-from typing import Any, Callable, Dict, Literal, Optional
+from typing import Any, Callable, Dict, Literal, Optional, Union
 
 from linkup import LinkupClient
 from pydantic import BaseModel, Field
@@ -46,17 +47,27 @@ class Tools:
         self,
         query: str,
         depth: Literal["standard", "deep"],
+        exclude_domains: Union[list[str], None] = None,
+        include_domains: Union[list[str], None] = None,
+        from_date: Union[str, None] = None,
+        to_date: Union[str, None] = None,
         __event_emitter__: Optional[Callable[[Dict], Any]] = None,
     ) -> str:
         # The docstring below is based on the official MCP server schema
-        # with an added preference for standard search depth:
+        # with an added preference for standard search depth and additional
+        # arguments (exclude_domains, include_domains, from_date, to_date):
         # https://github.com/LinkupPlatform/python-mcp-server/blob/main/src/mcp_search_linkup/server.py
+        # https://github.com/LinkupPlatform/linkup-python-sdk/blob/main/src/linkup/client.py
         """
         Search the web in real time using Linkup. Use this tool whenever the user needs trusted facts, news, or source-backed information. Returns comprehensive content from the most relevant sources.
         Prefer standard search depth for quick, general queries.
 
         :param query: Natural language search query. Full questions work best, e.g., 'How does the new EU AI Act affect startups?'
         :param depth: The search depth to perform. Use 'standard' for queries with likely direct answers. Use 'deep' for complex queries requiring comprehensive analysis or multi-hop questions
+        :param exclude_domains: List of domains to exclude from search results
+        :param include_domains: List of domains to only return search results for
+        :param from_date: Date (YYYY-MM-DD) from which search results should begin
+        :param to_date: Date (YYYY-MM-DD) until which search results should end
         """
 
         async def emit_status(description: str, done: bool = False):
@@ -91,6 +102,10 @@ class Tools:
             await emit_status(error_msg, done=True)
             return f"Error: {error_msg}"
 
+        # Convert date to python type
+        from_date_obj = date.fromisoformat(from_date) if from_date else None
+        to_date_obj = date.fromisoformat(to_date) if to_date else None
+
         try:
             await emit_status(f"Searching the web for: {query}")
 
@@ -99,7 +114,13 @@ class Tools:
 
             # Perform search
             response = await client.async_search(
-                query=query, depth=depth, output_type=self.valves.output_type
+                query=query,
+                depth=depth,
+                output_type=self.valves.output_type,
+                exclude_domains=exclude_domains,
+                include_domains=include_domains,
+                from_date=from_date_obj,
+                to_date=to_date_obj,
             )
 
             await emit_status("Processing search results", done=False)
