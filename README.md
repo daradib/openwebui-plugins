@@ -6,7 +6,7 @@ This repository contains custom tools for Open WebUI.
 
 Linkup Web Search is a tool that provides real-time web search capabilities with citations.
 
-The tool accepts two required arguments from the model: query and depth. The depth is "standard" for quick, general queries or "deep" for comprehensive analysis. Optional arguments are exclude_domains, include_domains, from_date, and to_date.
+The tool accepts `query` as a required argument. Optional additional arguments are `from_date`, `to_date`, `exclude_domains`, and `include_domains`.
 
 ### Setup
 

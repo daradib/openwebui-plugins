@@ -5,14 +5,14 @@ author_url: https://github.com/daradib/
 git_url: https://github.com/daradib/openwebui-plugins.git
 description: Search the web using the Linkup API. Provides real-time web search capabilities with citations.
 requirements: linkup-sdk
-version: 0.1.2
+version: 0.1.3
 license: BSD-3
 """
 
 from datetime import date
 import json
 import re
-from typing import Any, Callable, Dict, Literal, Optional, Union
+from typing import Any, Callable, Dict, Optional
 
 from linkup import LinkupClient
 from pydantic import BaseModel, Field
@@ -46,28 +46,25 @@ class Tools:
     async def linkup_web_search(
         self,
         query: str,
-        depth: Literal["standard", "deep"],
-        exclude_domains: Union[list[str], None] = None,
-        include_domains: Union[list[str], None] = None,
-        from_date: Union[str, None] = None,
-        to_date: Union[str, None] = None,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        exclude_domains: Optional[list[str]] = None,
+        include_domains: Optional[list[str]] = None,
         __event_emitter__: Optional[Callable[[Dict], Any]] = None,
     ) -> str:
         # The docstring below is based on the official MCP server schema
-        # with an added preference for standard search depth and additional
-        # arguments (exclude_domains, include_domains, from_date, to_date):
+        # without configurable search depth (always standard) and additional
+        # arguments (from_date, to_date, exclude_domains, include_domains):
         # https://github.com/LinkupPlatform/python-mcp-server/blob/main/src/mcp_search_linkup/server.py
         # https://github.com/LinkupPlatform/linkup-python-sdk/blob/main/src/linkup/client.py
         """
         Search the web in real time using Linkup. Use this tool whenever the user needs trusted facts, news, or source-backed information. Returns comprehensive content from the most relevant sources.
-        Prefer standard search depth for quick, general queries.
 
         :param query: Natural language search query. Full questions work best, e.g., 'How does the new EU AI Act affect startups?'
-        :param depth: The search depth to perform. Use 'standard' for queries with likely direct answers. Use 'deep' for complex queries requiring comprehensive analysis or multi-hop questions
-        :param exclude_domains: List of domains to exclude from search results
-        :param include_domains: List of domains to only return search results for
         :param from_date: Date (YYYY-MM-DD) from which search results should begin
         :param to_date: Date (YYYY-MM-DD) until which search results should end
+        :param exclude_domains: List of domains to exclude from search results
+        :param include_domains: List of domains to only return search results for
         """
 
         async def emit_status(description: str, done: bool = False):
@@ -90,12 +87,6 @@ class Tools:
             await emit_status(error_msg, done=True)
             return f"Error: {error_msg}"
 
-        # Validate depth parameter
-        if depth not in {"standard", "deep"}:
-            error_msg = "Search depth must be set to 'standard' for quick searches or 'deep' for comprehensive analysis."
-            await emit_status(error_msg, done=True)
-            return f"Error: {error_msg}"
-
         # Validate output type
         if self.valves.output_type not in {"sourcedAnswer", "searchResults"}:
             error_msg = "Output type must be set to 'searchResults' for model grounding or 'sourcedAnswer' for a direct answer."
@@ -115,12 +106,12 @@ class Tools:
             # Perform search
             response = await client.async_search(
                 query=query,
-                depth=depth,
+                depth="standard",
                 output_type=self.valves.output_type,
-                exclude_domains=exclude_domains,
-                include_domains=include_domains,
                 from_date=from_date_obj,
                 to_date=to_date_obj,
+                exclude_domains=exclude_domains,
+                include_domains=include_domains,
             )
 
             await emit_status("Processing search results", done=False)
