@@ -1,47 +1,119 @@
 # openwebui-plugins
 
-This repository contains custom tools for Open WebUI.
+A collection of powerful tools to enhance [Open WebUI](https://github.com/open-webui/open-webui) with agentic search and retrieval capabilities for multi-step reasoning and ReAct (Reasoning and Acting) workflows.
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Tools](#tools)
+  - [Document Search](#document-search)
+  - [Linkup Web Search](#linkup-web-search)
+  - [Perplexity Web Search (OpenRouter)](#perplexity-web-search-openrouter)
+- [License](#license)
+
+## Overview
+
+While Open WebUI has built-in document and web search functionality, these tools provide **native tool access** that enables models to use search capabilities in agentic workflows. This allows models to:
+
+- **Decompose complex questions** into focused sub-queries
+- **Use search tools iteratively**, refining queries based on results
+- **Reason through multi-step problems** using ReAct (Reasoning and Acting) patterns
+- **Chain multiple searches** to build comprehensive understanding
+
+This repository provides three specialized tools for Open WebUI:
+
+- **Document Search**: Search document collections with hybrid semantic and keyword matching
+- **Linkup Web Search**: Access current web search results with flexible filtering
+- **Perplexity Web Search (OpenRouter)**: Access search summaries through OpenRouter
+
+Each tool includes automatic citation generation and is designed for seamless integration into agentic reasoning workflows.
 
 ## Tools
 
 ### Document Search
 
-Document Search is a tool that retrieves documents from a Milvus vector store using hybrid search (combining dense vector similarity and BM25 sparse retrieval for improved accuracy). This tool is ideal for Retrieval-Augmented Generation (RAG) applications where you need to search through your own document collection with automatic citations.
+**Purpose**: Search through document collections with agentic workflow support.
 
-The tool accepts `query` as a required argument and `similarity_top_k` (default: 5) and `filters` as optional arguments. The `filters` parameter allows metadata filtering using a list of dictionaries with 'key' and 'value' pairs (e.g., `[{"key": "file_name", "value": "report.pdf"}]`).
+This tool enables models to iteratively explore knowledge bases through multi-step reasoning:
 
-#### Setup
+- **Dense vector similarity**: Finds documents with similar semantic meaning to enable conceptual exploration
+- **BM25 sparse retrieval**: Matches specific keywords and phrases for precise fact-finding
+- **Metadata filtering**: Allows models to focus searches on specific documents or sources
+- **Iterative refinement**: Models can chain searches, using results to inform follow-up queries
+- **Citation tracking**: Maintain source accountability across reasoning chains
 
-1. **Build the Document Store** (optional): Use `utils/build_document_store.py` to create your vector store:
+This approach provides more accurate results, making it perfect for agentic Retrieval-Augmented Generation (RAG) workflows where models need to reason through complex document collections.
 
+#### Key Features
+
+- Hybrid semantic and keyword search for higher accuracy
+- Metadata filtering (search within a specific file)
+- Configurable result count (default: 5 results)
+- High-performance vector storage (Milvus)
+- Automatic citation generation
+- Build utility which supports multiple document formats (LlamaIndex, PyMuPDF, etc.)
+
+#### Quick Start
+
+1. **Prepare documents** in a folder
+2. **Build the document store** using the provided utility
+3. **Import the tool** into Open WebUI
+4. **Configure the connection** to the document store
+
+#### Tool Parameters
+
+- **Required**: `query` - search query
+- **Optional**: `similarity_top_k` - number of results (default: 5)
+- **Optional**: `filters` - metadata filters, e.g., `[{"key": "file_name", "value": "report.pdf"}]`
+
+#### Performance Tips
+
+- **For maximum accuracy**: Use a larger model like `Snowflake/snowflake-arctic-embed-m-v1.5` when building the document store
+- **For faster queries**: Use a smaller model like `MongoDB/mdbr-leaf-ir` (compatible with `Snowflake/snowflake-arctic-embed-m-v1.5`) for query embeddings
+- **Model recommendations**: Check the [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard) and sort by "Retrieval" column
+
+#### Building the Document Store
+
+**Basic setup** (fastest, good for testing):
 ```bash
-# Build the document store (default options, fast)
-python utils/build_document_store.py /path/to/your/documents
+python utils/build_document_store.py /path/to/documents
+```
 
-# Build the document store (recommended alternative, slower but more accurate)
+**Recommended setup** (slower but more accurate):
+```bash
 python utils/build_document_store.py \
   --embedding_model Snowflake/snowflake-arctic-embed-m-v1.5 \
   --output_format markdown \
-  /path/to/your/documents
+  /path/to/documents
 ```
 
-2. **Import the Tool**: Import the tool into Open WebUI (Workspace - Tools).
+If needed, install the required dependencies for the build utility:
 
-3. **Configure Settings**: Click the valves settings icon and configure it for the document store that was created (or existing).
+```bash
+# May be necessary to downgrade NumPy to avoid runtime warnings
+pip install "numpy<2"
 
-To maximize performance, build the document store on a faster computer using a larger model (e.g., `Snowflake/snowflake-arctic-embed-m-v1.5`) for text embeddings. You can still perform queries on a slower computer using a smaller model for query embeddings (e.g., `MongoDB/mdbr-leaf-ir`) that is aligned with the larger model.
+# If running on CPU, install to skip GPU dependencies
+pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-For available embeddings, refer to the [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard) for English or Multilingual and sort by the Retrieval column.
+# Core dependencies
+pip install llama-index-core llama-index-readers-file \
+  llama-index-embeddings-huggingface llama-index-vector-stores-milvus \
+  milvus-lite
 
-#### Command-Line Utility
+# PDF support
+pip install PyMuPDF      # For plain text extraction (faster)
+pip install pymupdf4llm  # For markdown extraction (recommended)
+```
 
-`utils/build_document_store.py` supports several configuration options:
+The build utility supports several options:
 
 ```bash
 usage: build_document_store.py [-h] [--milvus_uri MILVUS_URI]
                                [--milvus_collection_name MILVUS_COLLECTION_NAME]
                                [--embedding_model EMBEDDING_MODEL]
                                [--output_format {plain,markdown}]
+                               [--overwrite]
                                input_dir
 
 Build a document store using LlamaIndex and Milvus
@@ -57,53 +129,85 @@ options:
   --milvus_collection_name MILVUS_COLLECTION_NAME
                         Milvus collection to build (default: llamalection)
   --embedding_model EMBEDDING_MODEL
-                        HuggingFace model for text embeddings
-                        (default: sentence-transformers/all-MiniLM-L6-v2)
+                        HuggingFace model for text embeddings (default:
+                        sentence-transformers/all-MiniLM-L6-v2)
   --output_format {plain,markdown}
                         Output format for document parsing (default: plain)
-```
-
-Installing dependencies for the utility:
-
-```bash
-# Install required dependencies
-pip install "numpy<2"  # to avoid runtime warnings
-pip install torch --index-url https://download.pytorch.org/whl/cpu  # if using CPU-only
-pip install llama-index-core llama-index-readers-file \
-  llama-index-embeddings-huggingface llama-index-vector-stores-milvus \
-  milvus-lite
-
-# Additional dependencies for parsing PDF files
-pip install PyMuPDF  # (--output-format=plain)
-pip install pymupdf4llm  # (--output-format=markdown)
+  --overwrite           Overwrite the existing Milvus collection if it exists
+                        (default: False)
 ```
 
 ### Linkup Web Search
 
-Linkup Web Search is a tool that provides real-time web search capabilities with citations.
+**Purpose**: Enable agentic web search with real-time information gathering.
 
-The tool accepts `query` as a required argument. Optional additional arguments are `from_date`, `to_date`, `exclude_domains`, and `include_domains`.
+This tool empowers models to conduct web research through iterative search strategies:
+
+- **Current information access**: Get up-to-date web results for time-sensitive queries
+- **Flexible filtering**: Models can refine searches by domain and date range
+- **Multi-step research**: Chain searches to build comprehensive understanding of topics
+- **Citation tracking**: Maintain source accountability across reasoning chains
+
+#### Key Features
+
+- Access web search results or AI-generated answers
+- Date range filtering
+- Domain inclusion/exclusion
+- Automatic citation generation
 
 #### Setup
 
-After importing the tool into Open WebUI (Workspace - Tools), click the valves settings icon and set the Linkup API key.
+1. **Import the tool** into Open WebUI (Workspace → Tools)
+2. **Get a Linkup API key** from [Linkup](https://linkup.so/)
+3. **Configure the tool** by clicking the valves settings icon and entering the API key
 
-The tool can be configured to return search results for model grounding or a sourced answer for reduced model usage. When output type is set to "searchResults" (default), it returns the raw search results including content and emits a citation for each result. When output type is set to "sourcedAnswer", it returns an answer with a list of sources and emits a citation for each source. "searchResults" will generally provide more accurate model grounding, but use more model context.
+#### Tool Parameters
+
+- **Required**: `query` - search query
+- **Optional**: `from_date` - search results from this date
+- **Optional**: `to_date` - search results until this date
+- **Optional**: `exclude_domains` - domains to exclude from results
+- **Optional**: `include_domains` - only include results from these domains
+
+#### Output Modes
+
+- **searchResults** (default): returns raw search results with full content and individual citations
+- **sourcedAnswer**: returns an AI-generated answer with source list and citations
+
+Choose `searchResults` for more accurate model grounding or `sourcedAnswer` to reduce token usage.
 
 ### Perplexity Web Search (OpenRouter)
 
-Perplexity Web Search (OpenRouter) is ported from the [Perplexity Web Search Tool](https://openwebui.com/t/abhiactually/perplexity) to use the OpenRouter API with a configurable model.
+**Purpose**: Access search summaries for enhanced reasoning workflows.
+
+This tool enables models to leverage Perplexity's advanced search capabilities in multi-step reasoning:
+
+- **Current information access**: Get pre-processed search summaries that models can build upon
+- **Model flexibility**: Configure different models through OpenRouter for varied reasoning approaches
+- **Citation tracking**: Maintain source accountability across reasoning chains
+
+This tool is adapted from the [Perplexity Web Search Tool](https://openwebui.com/t/abhiactually/perplexity) to support agentic workflows through OpenRouter.
+
+#### Key Features
+
+- Access AI-generated answers from web search
+- Configurable model selection
+- Automatic citation generation
 
 #### Setup
 
-After importing the tool into Open WebUI (Workspace - Tools), click the valves settings icon and set the OpenRouter API key.
+1. **Import the tool** into Open WebUI (Workspace → Tools)
+2. **Get an OpenRouter API key** from [OpenRouter](https://openrouter.ai/)
+3. **Configure the tool** by clicking the valves settings icon and entering the API key
 
-The tool can be configured to use Perplexity Sonar Pro (default) or another model.
+The tool defaults to Perplexity Sonar Pro but can be configured to use other compatible models.
 
 ## License
 
-Copyright (c) 2025 Dara Adib
+Copyright © 2025 Dara Adib
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License along with this program. If not, see <https://www.gnu.org/licenses/>.
