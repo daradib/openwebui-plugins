@@ -4,6 +4,80 @@ This repository contains custom tools for Open WebUI.
 
 ## Tools
 
+### Document Search
+
+Document Search is a tool that retrieves documents from a Milvus vector store using hybrid search (combining dense vector similarity and BM25 sparse retrieval for improved accuracy). This tool is ideal for Retrieval-Augmented Generation (RAG) applications where you need to search through your own document collection with automatic citations.
+
+The tool accepts `query` as a required argument and `similarity_top_k` (default: 5) and `filters` as optional arguments. The `filters` parameter allows metadata filtering using a list of dictionaries with 'key' and 'value' pairs (e.g., `[{"key": "file_name", "value": "report.pdf"}]`).
+
+#### Setup
+
+1. **Build the Document Store** (optional): Use `utils/build_document_store.py` to create your vector store:
+
+```bash
+# Build the document store (default options, fast)
+python utils/build_document_store.py /path/to/your/documents
+
+# Build the document store (recommended alternative, slower but more accurate)
+python utils/build_document_store.py \
+  --embedding_model Snowflake/snowflake-arctic-embed-m-v1.5 \
+  --output_format markdown \
+  /path/to/your/documents
+```
+
+2. **Import the Tool**: Import the tool into Open WebUI (Workspace - Tools).
+
+3. **Configure Settings**: Click the valves settings icon and configure it for the document store that was created (or existing).
+
+To maximize performance, build the document store on a faster computer using a larger model (e.g., `Snowflake/snowflake-arctic-embed-m-v1.5`) for text embeddings. You can still perform queries on a slower computer using a smaller model for query embeddings (e.g., `MongoDB/mdbr-leaf-ir`) that is aligned with the larger model.
+
+For available embeddings, refer to the [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard) for English or Multilingual and sort by the Retrieval column.
+
+#### Command-Line Utility
+
+`utils/build_document_store.py` supports several configuration options:
+
+```bash
+usage: build_document_store.py [-h] [--milvus_uri MILVUS_URI]
+                               [--milvus_collection_name MILVUS_COLLECTION_NAME]
+                               [--embedding_model EMBEDDING_MODEL]
+                               [--output_format {plain,markdown}]
+                               input_dir
+
+Build a document store using LlamaIndex and Milvus
+
+positional arguments:
+  input_dir             Directory containing input documents
+
+options:
+  -h, --help            show this help message and exit
+  --milvus_uri MILVUS_URI
+                        Path to a Milvus Lite database file or remote Milvus
+                        instance (default: ./milvus_llamaindex.db)
+  --milvus_collection_name MILVUS_COLLECTION_NAME
+                        Milvus collection to build (default: llamalection)
+  --embedding_model EMBEDDING_MODEL
+                        HuggingFace model for text embeddings
+                        (default: sentence-transformers/all-MiniLM-L6-v2)
+  --output_format {plain,markdown}
+                        Output format for document parsing (default: plain)
+```
+
+Installing dependencies for the utility:
+
+```bash
+# Install required dependencies
+pip install "numpy<2"  # to avoid runtime warnings
+pip install torch --index-url https://download.pytorch.org/whl/cpu  # if using CPU-only
+pip install llama-index-core llama-index-readers-file \
+  llama-index-embeddings-huggingface llama-index-vector-stores-milvus \
+  milvus-lite
+
+# Additional dependencies for parsing PDF files
+pip install PyMuPDF  # (--output-format=plain)
+pip install pymupdf4llm  # (--output-format=markdown)
+```
+
 ### Linkup Web Search
 
 Linkup Web Search is a tool that provides real-time web search capabilities with citations.
