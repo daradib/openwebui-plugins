@@ -6,7 +6,7 @@ git_url: https://github.com/daradib/openwebui-plugins.git
 description: Search the web using the Linkup API. Provides real-time web search capabilities with citations.
 requirements: linkup-sdk
 version: 0.1.3
-license: BSD-3
+license: AGPL-3.0-or-later
 """
 
 from datetime import date
