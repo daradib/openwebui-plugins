@@ -34,47 +34,42 @@ Each tool includes automatic citation generation and is designed for seamless in
 
 **Purpose**: Search through document collections with agentic workflow support.
 
-This tool enables models to iteratively explore knowledge bases through multi-step reasoning:
-
-- **Dense vector similarity**: Finds documents with similar semantic meaning to enable conceptual exploration
-- **BM25 sparse retrieval**: Matches specific keywords and phrases for precise fact-finding
-- **Metadata filtering**: Allows models to focus searches on specific documents or sources
-- **Iterative refinement**: Models can chain searches, using results to inform follow-up queries
-- **Citation tracking**: Maintain source accountability across reasoning chains
-
-This approach provides more accurate results, making it perfect for agentic Retrieval-Augmented Generation (RAG) workflows where models need to reason through complex document collections.
+This tool enables models to iteratively explore knowledge bases through multi-step reasoning. Models can split and chain searches, using results to inform follow-up queries. This approach provides more accurate results, making it perfect for agentic Retrieval-Augmented Generation (RAG).
 
 #### Key Features
 
-- Hybrid semantic and keyword search for higher accuracy
-- Metadata filtering (search within a specific file)
-- Configurable result count (default: 5 results)
+- Hybrid semantic and keyword search for better accuracy
+- Optionally specify result count (default: 5 results)
+- Optionally specify file name to filter results
 - High-performance vector storage (Milvus)
-- Automatic citation generation
+- Configurable embedding models (Ollama and HuggingFace)
+- Automatic citation generation with sequential indices for inline references
 - Build utility which supports multiple document formats (LlamaIndex, PyMuPDF, etc.)
 
 #### Quick Start
 
 1. **Prepare documents** in a folder
-2. **Build the document store** using the provided utility
+2. **Build the document store** using the [build utility](https://github.com/daradib/openwebui-plugins/blob/main/utils/build_document_store.py)
 3. **Import the tool** into Open WebUI
 4. **Configure the connection** to the document store
 
 #### Tool Parameters
 
 - **Required**: `query` - search query
-- **Optional**: `similarity_top_k` - number of results (default: 5)
-- **Optional**: `filters` - metadata filters, e.g., `[{"key": "file_name", "value": "report.pdf"}]`
+- **Optional**: `top_k` - number of results (default: 5)
+- **Optional**: `file_name` - filter results by filename (default: None)
 
-#### Performance Tips
+#### Tips for Better Accuracy
 
-- **For maximum accuracy**: Use a larger model like `Snowflake/snowflake-arctic-embed-m-v1.5` when building the document store
-- **For faster queries**: Use a smaller model like `MongoDB/mdbr-leaf-ir` (compatible with `Snowflake/snowflake-arctic-embed-m-v1.5`) for query embeddings
-- **Model recommendations**: Check the [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard) and sort by "Retrieval" column
+- Parse PDF files as Markdown instead of plain text.
+- Use a larger embedding model like the Qwen3-Embedding model series (0.6B, 4B, or 8B). Check the [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard), chose English or Multilingual as appropriate, and sort by the "Retrieval" column.
+- Set the query instruction for the model, e.g., for Qwen3-Embedding model series: `Given a web search query, retrieve relevant passages that answer the query\nQuery:`
 
 #### Building the Document Store
 
-**Basic setup** (fastest, good for testing):
+Download the [build utility](https://github.com/daradib/openwebui-plugins/blob/main/utils/build_document_store.py).
+
+**Basic setup** (fast, good for testing):
 ```bash
 python utils/build_document_store.py /path/to/documents
 ```
@@ -82,12 +77,12 @@ python utils/build_document_store.py /path/to/documents
 **Recommended setup** (slower but more accurate):
 ```bash
 python utils/build_document_store.py \
-  --embedding_model Snowflake/snowflake-arctic-embed-m-v1.5 \
+  --embedding_model Qwen/Qwen3-Embedding-0.6B \
   --output_format markdown \
   /path/to/documents
 ```
 
-If needed, install the required dependencies for the build utility:
+If needed, install the required dependencies for the [build utility](https://github.com/daradib/openwebui-plugins/blob/main/utils/build_document_store.py):
 
 ```bash
 # May be necessary to downgrade NumPy to avoid runtime warnings
@@ -106,9 +101,9 @@ pip install PyMuPDF      # For plain text extraction (faster)
 pip install pymupdf4llm  # For markdown extraction (recommended)
 ```
 
-The build utility supports several options:
+The [build utility](https://github.com/daradib/openwebui-plugins/blob/main/utils/build_document_store.py) supports several options:
 
-```bash
+```
 usage: build_document_store.py [-h] [--milvus_uri MILVUS_URI]
                                [--milvus_collection_name MILVUS_COLLECTION_NAME]
                                [--embedding_model EMBEDDING_MODEL]
@@ -141,12 +136,7 @@ options:
 
 **Purpose**: Enable agentic web search with real-time information gathering.
 
-This tool empowers models to conduct web research through iterative search strategies:
-
-- **Current information access**: Get up-to-date web results for time-sensitive queries
-- **Flexible filtering**: Models can refine searches by domain and date range
-- **Multi-step research**: Chain searches to build comprehensive understanding of topics
-- **Citation tracking**: Maintain source accountability across reasoning chains
+This tool empowers models to conduct web research through iterative search strategies. Models can split and chain searches to build comprehensive understanding of topics.
 
 #### Key Features
 
@@ -178,15 +168,9 @@ Choose `searchResults` for more accurate model grounding or `sourcedAnswer` to r
 
 ### Perplexity Web Search (OpenRouter)
 
-**Purpose**: Access search summaries for enhanced reasoning workflows.
+**Purpose**: Access search summaries for multi-step reasoning workflows.
 
-This tool enables models to leverage Perplexity's advanced search capabilities in multi-step reasoning:
-
-- **Current information access**: Get pre-processed search summaries that models can build upon
-- **Model flexibility**: Configure different models through OpenRouter for varied reasoning approaches
-- **Citation tracking**: Maintain source accountability across reasoning chains
-
-This tool is adapted from the [Perplexity Web Search Tool](https://openwebui.com/t/abhiactually/perplexity) to support agentic workflows through OpenRouter.
+This tool enables models to leverage Perplexity's search summaries. It is adapted from the [Perplexity Web Search Tool](https://openwebui.com/t/abhiactually/perplexity) to support OpenRouter.
 
 #### Key Features
 
