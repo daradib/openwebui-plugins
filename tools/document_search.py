@@ -4,8 +4,8 @@ author: daradib
 author_url: https://github.com/daradib/
 git_url: https://github.com/daradib/openwebui-plugins.git
 description: Retrieves documents from a Milvus vector store. Supports hybrid search for agentic knowledge base RAG.
-requirements: llama-index-core, llama-index-embeddings-huggingface, llama-index-vector-stores-milvus
-version: 0.1.0
+requirements: llama-index-core, llama-index-embeddings-huggingface, llama-index-embeddings-ollama, llama-index-vector-stores-milvus
+version: 0.1.1
 license: AGPL-3.0-or-later
 """
 
@@ -15,6 +15,7 @@ license: AGPL-3.0-or-later
 # for state synchronization.
 
 import asyncio
+import codecs
 import json
 import re
 from typing import Any, Callable, Dict, Optional
@@ -27,13 +28,18 @@ from llama_index.core.vector_stores import (
     MetadataFilters,
 )
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.vector_stores.milvus import MilvusVectorStore
 from llama_index.vector_stores.milvus.utils import BM25BuiltInFunction
 from pydantic import BaseModel, Field
 
 
 def get_vector_index(
-    milvus_uri: str, milvus_collection_name: str, embedding_model: str
+    milvus_uri: str,
+    milvus_collection_name: str,
+    embedding_model: str,
+    embedding_query_instruction: Optional[str] = None,
+    ollama_base_url: Optional[str] = None,
 ) -> VectorStoreIndex:
     """
     Initialize and return the VectorStoreIndex object.
@@ -49,8 +55,23 @@ def get_vector_index(
         sparse_embedding_function=BM25BuiltInFunction(),
     )
 
-    # Load the specified embedding model from HuggingFace.
-    embed_model = HuggingFaceEmbedding(model_name=embedding_model)
+    # Load the specified embedding model from HuggingFace or Ollama.
+    # Interpret escape sequences, e.g., literal '\n' into an actual newline.
+    if embedding_query_instruction:
+        query_instruction = codecs.decode(embedding_query_instruction, "unicode_escape")
+    else:
+        query_instruction = None
+    if ollama_base_url:
+        embed_model = OllamaEmbedding(
+            model_name=embedding_model,
+            base_url=ollama_base_url,
+            query_instruction=query_instruction,
+        )
+    else:
+        embed_model = HuggingFaceEmbedding(
+            model_name=embedding_model,
+            query_instruction=query_instruction,
+        )
 
     # Create the index object from the existing vector store.
     index = VectorStoreIndex.from_vector_store(
@@ -168,15 +189,23 @@ class Tools:
     class Valves(BaseModel):
         milvus_uri: str = Field(
             default="./milvus_llamaindex.db",
-            description="Path to a Milvus Lite database file or remote Milvus instance",
+            description="Path to a Milvus Lite database file or remote Milvus instance.",
         )
         milvus_collection_name: str = Field(
             default="llamacollection",
-            description="Milvus collection containing both dense vectors and BM25 sparse vectors",
+            description="Milvus collection containing both dense vectors and BM25 sparse vectors.",
         )
         embedding_model: str = Field(
             default="sentence-transformers/all-MiniLM-L6-v2",
-            description="HuggingFace model for query embeddings, which must match (or be aligned with) the model used to create the text embeddings",
+            description="Model for query embeddings, which should match the model used to create the text embeddings.",
+        )
+        embedding_query_instruction: Optional[str] = Field(
+            default=None,
+            description="Instruction to prepend to query before embedding, e.g., 'Query:'. Escape sequences like \\n are interpreted.",
+        )
+        ollama_base_url: Optional[str] = Field(
+            default=None,
+            description="Base URL for Ollama API (recommended). When set, uses Ollama instead of downloading the embedding model from HuggingFace.",
         )
 
     def __init__(self):
