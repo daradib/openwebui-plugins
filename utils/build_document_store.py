@@ -88,7 +88,7 @@ def build_document_store(args: argparse.Namespace):
     # Load documents
     file_extractor = {".pdf": parser_obj}
     documents = SimpleDirectoryReader(
-        args.input_dir, file_extractor=file_extractor
+        args.input_dir, recursive=True, file_extractor=file_extractor
     ).load_data(show_progress=True)
 
     # Build index
