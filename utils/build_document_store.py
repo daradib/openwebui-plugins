@@ -32,7 +32,7 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument(
         "--milvus_collection_name",
-        default="llamalection",
+        default="llamacollection",
         help="Milvus collection to build",
     )
     parser.add_argument(

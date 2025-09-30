@@ -151,7 +151,7 @@ class Tools:
             description="Path to a Milvus Lite database file or remote Milvus instance",
         )
         milvus_collection_name: str = Field(
-            default="llamalection",
+            default="llamacollection",
             description="Milvus collection containing both dense vectors and BM25 sparse vectors",
         )
         embedding_model: str = Field(
