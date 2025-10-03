@@ -52,6 +52,7 @@ This tool enables models to iteratively explore knowledge bases through multi-st
 2. **Build the document store** using the [build utility][build_document_store.py]
 3. **Import the tool** into Open WebUI
 4. **Configure the connection** to the document store
+5. **Create a model** in the workspace with access to the tool and a custom prompt
 
 #### Tool Parameters
 
@@ -64,6 +65,7 @@ This tool enables models to iteratively explore knowledge bases through multi-st
 - Parse PDF files as Markdown instead of plain text.
 - Use a larger embedding model like the Qwen3-Embedding model series (0.6B, 4B, or 8B). Check the [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard), choose English or Multilingual as appropriate, and sort by the "Retrieval" column.
 - Set the query instruction for the model, e.g., for Qwen3-Embedding model series: `Given a web search query, retrieve relevant passages that answer the query\nQuery:`
+- Provide context on the documents in the system prompt (see [prompt example](#example-system-prompt)).
 
 #### Building the Document Store
 
@@ -164,6 +166,25 @@ There are also utilities to [copy from Milvus to Qdrant][copy_milvus_to_qdrant.p
 [build_document_store.py]: utils/build_document_store.py
 [copy_milvus_to_qdrant.py]: utils/copy_milvus_to_qdrant.py
 [copy_qdrant_to_qdrant.py]: utils/copy_qdrant_to_qdrant.py
+
+#### Example System Prompt
+
+> You are Danesh, a highly specialized AI assistant and expert query engine for a knowledge base of documents.
+>
+> SEARCH STRATEGY:
+> - Decompose complex questions into focused sub-queries
+> - Use the search tool iteratively, refining queries based on results
+> - Gather comprehensive context before synthesizing your final answer
+>
+> RESPONSE REQUIREMENTS:
+> - Base answers STRICTLY and EXCLUSIVELY on search result information
+> - If insufficient information is found, clearly state this limitation
+> - Include inline citations as [1][2][3] when ID numbers are available in search results
+> - Provide factual, accurate, and comprehensive responses
+>
+> SCOPE:
+> - Focus on document search results
+> - For tangentially related queries, acknowledge the connection but redirect to document-specific aspects
 
 ### Linkup Web Search
 
