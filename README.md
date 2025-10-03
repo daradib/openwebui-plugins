@@ -40,8 +40,8 @@ This tool enables models to iteratively explore knowledge bases through multi-st
 
 - Hybrid semantic and keyword search for better accuracy
 - Optionally specify result count (default: 5 results)
-- Optionally specify file name to filter results
-- High-performance vector storage (Milvus)
+- Optionally specify file name to filter results (default: None)
+- High-performance vector storage (Qdrant)
 - Configurable embedding models (Ollama and HuggingFace)
 - Automatic citation generation with sequential indices for inline references
 - Build utility which supports multiple document formats (LlamaIndex, PyMuPDF, etc.)
@@ -85,51 +85,49 @@ python utils/build_document_store.py \
 If needed, install the required dependencies for the [build utility](https://github.com/daradib/openwebui-plugins/blob/main/utils/build_document_store.py):
 
 ```bash
-# May be necessary to downgrade NumPy to avoid runtime warnings
-pip install "numpy<2"
-
-# If running on CPU, install to skip GPU dependencies
+# If running on CPU, install CPU variants of dependencies
+pip install fastembed
 pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-# Core dependencies
-pip install llama-index-core llama-index-readers-file \
-  llama-index-embeddings-huggingface llama-index-vector-stores-milvus \
-  milvus-lite
+# If running on GPU, install GPU variants of dependencies
+pip install fastembed-gpu torch
 
-# PDF support
-pip install PyMuPDF      # For plain text extraction (faster)
-pip install pymupdf4llm  # For markdown extraction (recommended)
+# Core dependencies
+pip install llama-index-embeddings-huggingface llama-index-vector-stores-qdrant
+
+# For PDF plain text extraction (faster)
+pip install llama-index-readers-file PyMuPDF
+
+# For PDF Markdown extraction (recommended)
+pip install pymupdf4llm
 ```
 
 The [build utility](https://github.com/daradib/openwebui-plugins/blob/main/utils/build_document_store.py) supports several options:
 
 ```
-usage: build_document_store.py [-h] [--milvus_uri MILVUS_URI]
-                               [--milvus_collection_name MILVUS_COLLECTION_NAME]
-                               [--embedding_model EMBEDDING_MODEL]
-                               [--output_format {plain,markdown}]
-                               [--overwrite]
+usage: build_document_store.py [-h] [--qdrant-url QDRANT_URL]
+                               [--qdrant-collection-name QDRANT_COLLECTION_NAME]
+                               [--embedding-model EMBEDDING_MODEL]
+                               [--output-format {plain,markdown}]
                                input_dir
 
-Build a document store using LlamaIndex and Milvus
+Build a document store using LlamaIndex and Qdrant
 
 positional arguments:
   input_dir             Directory containing input documents
 
 options:
   -h, --help            show this help message and exit
-  --milvus_uri MILVUS_URI
-                        Path to a Milvus Lite database file or remote Milvus
-                        instance (default: ./milvus_llamaindex.db)
-  --milvus_collection_name MILVUS_COLLECTION_NAME
-                        Milvus collection to build (default: llamalection)
-  --embedding_model EMBEDDING_MODEL
+  --qdrant-url QDRANT_URL
+                        Path to a local Qdrant directory or remote Qdrant
+                        instance (default: ./qdrant_db)
+  --qdrant-collection-name QDRANT_COLLECTION_NAME
+                        Qdrant collection to build (default: llamacollection)
+  --embedding-model EMBEDDING_MODEL
                         HuggingFace model for text embeddings (default:
                         sentence-transformers/all-MiniLM-L6-v2)
-  --output_format {plain,markdown}
+  --output-format {plain,markdown}
                         Output format for document parsing (default: plain)
-  --overwrite           Overwrite the existing Milvus collection if it exists
-                        (default: False)
 ```
 
 There is also a [utility to copy from Milvus to Qdrant](https://github.com/daradib/openwebui-plugins/blob/main/utils/copy_milvus_to_qdrant.py) if you're looking to migrate from Milvus.

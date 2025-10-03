@@ -1,23 +1,37 @@
 #!/usr/bin/env python3
 
 import argparse
+from urllib.parse import urlparse
 
 from llama_index.core import SimpleDirectoryReader, StorageContext, VectorStoreIndex
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.vector_stores.milvus import MilvusVectorStore
-from llama_index.vector_stores.milvus.utils import BM25BuiltInFunction
+from llama_index.vector_stores.qdrant import QdrantVectorStore
+from qdrant_client import QdrantClient
 
 
 # Installation Notes:
-# pip install "numpy<2" # to downgrade NumPy if needed to avoid runtime warning
-# pip install torch --index-url https://download.pytorch.org/whl/cpu # to install torch without gpu dependencies
-# pip install llama-index-core llama-index-readers-file llama-index-embeddings-huggingface llama-index-vector-stores-milvus milvus-lite
+#
+# If running on CPU, install CPU variants of dependencies
+# pip install fastembed
+# pip install torch --index-url https://download.pytorch.org/whl/cpu
+#
+# If running on GPU, install GPU variants of dependencies
+# pip install fastembed-gpu torch
+#
+# Core dependencies
+# pip install llama-index-embeddings-huggingface llama-index-vector-stores-qdrant
+#
+# For PDF plain text extraction (faster)
+# pip install llama-index-readers-file PyMuPDF
+#
+# For PDF Markdown extraction (recommended)
+# pip install pymupdf4llm
 
 
 def parse_arguments() -> argparse.Namespace:
     """Parse and return command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Build a document store using LlamaIndex and Milvus",
+        description="Build a document store using LlamaIndex and Qdrant",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
@@ -26,40 +40,35 @@ def parse_arguments() -> argparse.Namespace:
 
     # Optional arguments with defaults
     parser.add_argument(
-        "--milvus_uri",
-        default="./milvus_llamaindex.db",
-        help="Path to a Milvus Lite database file or remote Milvus instance",
+        "--qdrant-url",
+        default="./qdrant_db",
+        help="Path to a local Qdrant directory or remote Qdrant instance",
     )
     parser.add_argument(
-        "--milvus_collection_name",
+        "--qdrant-collection-name",
         default="llamacollection",
-        help="Milvus collection to build",
+        help="Qdrant collection to build",
     )
     parser.add_argument(
-        "--embedding_model",
+        "--embedding-model",
         default="sentence-transformers/all-MiniLM-L6-v2",
         help="HuggingFace model for text embeddings",
     )
     parser.add_argument(
-        "--output_format",
+        "--output-format",
         choices=["plain", "markdown"],
         default="plain",
         help="Output format for document parsing",
-    )
-    parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="Overwrite the existing Milvus collection if it exists",
     )
 
     return parser.parse_args()
 
 
-def build_document_store(args: argparse.Namespace):
+def build_document_store(args: argparse.Namespace) -> None:
     """Build the document store with the given arguments."""
     # Set up document parser based on output format
     if args.output_format == "plain":
-        # pip install PyMuPDF
+        # pip install llama-index-readers-file PyMuPDF
         from llama_index.readers.file import PyMuPDFReader
 
         parser_obj = PyMuPDFReader()
@@ -75,14 +84,18 @@ def build_document_store(args: argparse.Namespace):
     embed_model = HuggingFaceEmbedding(model_name=args.embedding_model)
 
     # Initialize vector store
-    milvus_dim = embed_model._model.get_sentence_embedding_dimension()
-    vector_store = MilvusVectorStore(
-        uri=args.milvus_uri,
-        collection_name=args.milvus_collection_name,
-        overwrite=args.overwrite,
-        dim=milvus_dim,
-        enable_sparse=True,
-        sparse_embedding_function=BM25BuiltInFunction(),
+    parsed_url = urlparse(args.qdrant_url, scheme="file")
+    if parsed_url.scheme == "file":
+        client = QdrantClient(path=parsed_url.path)
+        kwargs = {"client": client}
+    else:
+        kwargs = {"url": args.qdrant_url, "api_key": ""}
+
+    vector_store = QdrantVectorStore(
+        collection_name=args.qdrant_collection_name,
+        enable_hybrid=True,
+        fastembed_sparse_model="Qdrant/bm25",
+        **kwargs,
     )
 
     # Load documents
@@ -101,12 +114,12 @@ def build_document_store(args: argparse.Namespace):
     )
 
     print(f"Successfully built document store with {len(documents)} documents")
-    print(f"Milvus URI: {args.milvus_uri}")
-    print(f"Milvus Collection Name: {args.milvus_collection_name}")
+    print(f"Qdrant URL: {args.qdrant_url}")
+    print(f"Qdrant Collection Name: {args.qdrant_collection_name}")
     print(f"Embedding Model: {args.embedding_model}")
 
 
-def main():
+def main() -> None:
     """Main entry point of the script."""
     args = parse_arguments()
     build_document_store(args)

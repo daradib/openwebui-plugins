@@ -3,9 +3,9 @@ title: Document Search
 author: daradib
 author_url: https://github.com/daradib/
 git_url: https://github.com/daradib/openwebui-plugins.git
-description: Retrieves documents from a Milvus vector store. Supports hybrid search for agentic knowledge base RAG.
-requirements: llama-index-embeddings-ollama, llama-index-vector-stores-milvus
-version: 0.1.2
+description: Retrieves documents from a Qdrant vector store. Supports hybrid search for agentic knowledge base RAG.
+requirements: fastembed, llama-index-embeddings-ollama, llama-index-vector-stores-qdrant
+version: 0.2.0
 license: AGPL-3.0-or-later
 """
 
@@ -20,12 +20,12 @@ license: AGPL-3.0-or-later
 # will call this tool from separate workers, consider modifying it to use Redis
 # for state synchronization.
 
-
 import asyncio
 import codecs
 import json
 import re
 from typing import Any, Callable, Dict, Optional
+from urllib.parse import urlparse
 
 from llama_index.core import VectorStoreIndex
 from llama_index.core.schema import NodeWithScore
@@ -35,14 +35,14 @@ from llama_index.core.vector_stores import (
     MetadataFilters,
 )
 from llama_index.embeddings.ollama import OllamaEmbedding
-from llama_index.vector_stores.milvus import MilvusVectorStore
-from llama_index.vector_stores.milvus.utils import BM25BuiltInFunction
+from llama_index.vector_stores.qdrant import QdrantVectorStore
 from pydantic import BaseModel, Field
+from qdrant_client import AsyncQdrantClient
 
 
 def get_vector_index(
-    milvus_uri: str,
-    milvus_collection_name: str,
+    qdrant_url: str,
+    qdrant_collection_name: str,
     embedding_model: str,
     embedding_query_instruction: Optional[str] = None,
     ollama_base_url: Optional[str] = None,
@@ -50,15 +50,21 @@ def get_vector_index(
     """
     Initialize and return the VectorStoreIndex object.
     """
-    # Connect to the existing Milvus vector store.
-    # `overwrite=False` ensures we don't delete the existing data.
-    # `enable_sparse=True` is necessary to signal the use of hybrid search.
-    vector_store = MilvusVectorStore(
-        uri=milvus_uri,
-        collection_name=milvus_collection_name,
-        overwrite=False,
-        enable_sparse=True,
-        sparse_embedding_function=BM25BuiltInFunction(),
+    # Connect to the existing Qdrant vector store.
+    parsed_url = urlparse(qdrant_url, scheme="file")
+    if parsed_url.scheme == "file":
+        aclient = AsyncQdrantClient(path=parsed_url.path)
+        kwargs = {"aclient": aclient}
+        # Workaround for https://github.com/run-llama/llama_index/issues/20002
+        QdrantVectorStore.use_old_sparse_encoder = lambda self, collection_name: False
+    else:
+        kwargs = {"url": qdrant_url, "api_key": ""}
+
+    vector_store = QdrantVectorStore(
+        collection_name=qdrant_collection_name,
+        enable_hybrid=True,
+        fastembed_sparse_model="Qdrant/bm25",
+        **kwargs,
     )
 
     # Load the specified embedding model from HuggingFace or Ollama.
@@ -75,6 +81,7 @@ def get_vector_index(
         )
     else:
         from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+
         embed_model = HuggingFaceEmbedding(
             model_name=embedding_model,
             query_instruction=query_instruction,
@@ -149,7 +156,9 @@ class CitationIndex:
         self._count = 0
         self._lock = asyncio.Lock()
 
-    async def emit_citation(self, node, __event_emitter__: Callable[[Dict], Any]):
+    async def emit_citation(
+        self, node, __event_emitter__: Callable[[Dict], Any]
+    ) -> None:
         source_name = node.metadata.get("file_name", "Retrieved Document")
         source_name += f" ({node.id_})"
         page_number = node.metadata.get("page") or node.metadata.get("source")
@@ -190,17 +199,17 @@ class CitationIndex:
 
 class Tools:
     """
-    A toolset for interacting with an existing Milvus vector store for Retrieval-Augmented Generation
+    A toolset for interacting with an existing Qdrant vector store for Retrieval-Augmented Generation
     """
 
     class Valves(BaseModel):
-        milvus_uri: str = Field(
-            default="./milvus_llamaindex.db",
-            description="Path to a Milvus Lite database file or remote Milvus instance.",
+        qdrant_url: str = Field(
+            default="./qdrant_db",
+            description="Path to a local Qdrant directory or remote Qdrant instance.",
         )
-        milvus_collection_name: str = Field(
+        qdrant_collection_name: str = Field(
             default="llamacollection",
-            description="Milvus collection containing both dense vectors and BM25 sparse vectors.",
+            description="Qdrant collection containing both dense vectors and sparse vectors.",
         )
         embedding_model: str = Field(
             default="sentence-transformers/all-MiniLM-L6-v2",
@@ -235,7 +244,7 @@ class Tools:
         __event_emitter__: Optional[Callable[[Dict], Any]] = None,
     ) -> str:
         """
-        Retrieve relevant documents from the Milvus vector store using hybrid search.
+        Retrieve relevant documents from the Qdrant vector store using hybrid search.
 
         :param query: The natural language search query.
         :param top_k: The number of top documents to retrieve.
@@ -244,7 +253,9 @@ class Tools:
         :param __event_emitter__: Injected by Open WebUI to send events to the frontend.
         """
 
-        async def emit_status(description: str, done: bool = False, hidden=False):
+        async def emit_status(
+            description: str, done: bool = False, hidden=False
+        ) -> None:
             """Helper function to emit status updates."""
             if __event_emitter__:
                 await __event_emitter__(
@@ -277,7 +288,7 @@ class Tools:
                 current_config = self.valves.model_dump_json()
                 if not self._index or self._last_config != current_config:
                     if self._index:
-                        self._index.vector_store.client.close()
+                        await self._index.vector_store._aclient.close()
                     self._index = get_vector_index(**dict(self.valves))
                     self._last_config = current_config
 
