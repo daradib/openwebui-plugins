@@ -132,6 +132,8 @@ options:
                         (default: False)
 ```
 
+There is also a [utility to copy from Milvus to Qdrant](https://github.com/daradib/openwebui-plugins/blob/main/utils/copy_milvus_to_qdrant.py) if you're looking to migrate from Milvus.
+
 ### Linkup Web Search
 
 **Purpose**: Enable agentic web search with real-time information gathering.
