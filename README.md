@@ -130,10 +130,11 @@ options:
                         Output format for document parsing (default: plain)
 ```
 
-There is also a [utility to copy from Milvus to Qdrant][copy_milvus_to_qdrant.py] if you're looking to migrate from Milvus.
+There are also utilities to [copy from Milvus to Qdrant][copy_milvus_to_qdrant.py] if you're looking to migrate from Milvus as well as to [copy Qdrant collections between servers][copy_qdrant_to_qdrant.py].
 
 [build_document_store.py]: utils/build_document_store.py
 [copy_milvus_to_qdrant.py]: utils/copy_milvus_to_qdrant.py
+[copy_qdrant_to_qdrant.py]: utils/copy_qdrant_to_qdrant.py
 
 ### Linkup Web Search
 
