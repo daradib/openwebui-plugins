@@ -49,7 +49,7 @@ This tool enables models to iteratively explore knowledge bases through multi-st
 #### Quick Start
 
 1. **Prepare documents** in a folder
-2. **Build the document store** using the [build utility](https://github.com/daradib/openwebui-plugins/blob/main/utils/build_document_store.py)
+2. **Build the document store** using the [build utility][build_document_store.py]
 3. **Import the tool** into Open WebUI
 4. **Configure the connection** to the document store
 
@@ -62,12 +62,12 @@ This tool enables models to iteratively explore knowledge bases through multi-st
 #### Tips for Better Accuracy
 
 - Parse PDF files as Markdown instead of plain text.
-- Use a larger embedding model like the Qwen3-Embedding model series (0.6B, 4B, or 8B). Check the [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard), chose English or Multilingual as appropriate, and sort by the "Retrieval" column.
+- Use a larger embedding model like the Qwen3-Embedding model series (0.6B, 4B, or 8B). Check the [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard), choose English or Multilingual as appropriate, and sort by the "Retrieval" column.
 - Set the query instruction for the model, e.g., for Qwen3-Embedding model series: `Given a web search query, retrieve relevant passages that answer the query\nQuery:`
 
 #### Building the Document Store
 
-Download the [build utility](https://github.com/daradib/openwebui-plugins/blob/main/utils/build_document_store.py).
+Download the [build utility][build_document_store.py].
 
 **Basic setup** (fast, good for testing):
 ```bash
@@ -82,7 +82,7 @@ python utils/build_document_store.py \
   /path/to/documents
 ```
 
-If needed, install the required dependencies for the [build utility](https://github.com/daradib/openwebui-plugins/blob/main/utils/build_document_store.py):
+If needed, install the required dependencies for the [build utility][build_document_store.py]:
 
 ```bash
 # If running on CPU, install CPU variants of dependencies
@@ -102,7 +102,7 @@ pip install llama-index-readers-file PyMuPDF
 pip install pymupdf4llm
 ```
 
-The [build utility](https://github.com/daradib/openwebui-plugins/blob/main/utils/build_document_store.py) supports several options:
+The [build utility][build_document_store.py] supports several options:
 
 ```
 usage: build_document_store.py [-h] [--qdrant-url QDRANT_URL]
@@ -130,7 +130,10 @@ options:
                         Output format for document parsing (default: plain)
 ```
 
-There is also a [utility to copy from Milvus to Qdrant](https://github.com/daradib/openwebui-plugins/blob/main/utils/copy_milvus_to_qdrant.py) if you're looking to migrate from Milvus.
+There is also a [utility to copy from Milvus to Qdrant][copy_milvus_to_qdrant.py] if you're looking to migrate from Milvus.
+
+[build_document_store.py]: utils/build_document_store.py
+[copy_milvus_to_qdrant.py]: utils/copy_milvus_to_qdrant.py
 
 ### Linkup Web Search
 
