@@ -82,24 +82,43 @@ python utils/build_document_store.py \
   /path/to/documents
 ```
 
-If needed, install the required dependencies for the [build utility][build_document_store.py]:
+To install the required dependencies for the [build utility][build_document_store.py]:
 
 ```bash
-# If running on CPU, install CPU variants of dependencies
-pip install fastembed
+## Core dependency (required)
+pip install llama-index-vector-stores-qdrant
+
+## Choose ONE dense embedding backend (required)
+
+### Option 1: Ollama (recommended)
+pip install llama-index-embeddings-ollama
+
+### Option 2: HuggingFace
+# CPU only:
 pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install llama-index-embeddings-huggingface
 
-# If running on GPU, install GPU variants of dependencies
-pip install fastembed-gpu torch
+# GPU (skip the torch line above if using GPU):
+pip install llama-index-embeddings-huggingface
 
-# Core dependencies
-pip install llama-index-embeddings-huggingface llama-index-vector-stores-qdrant
+## Choose ONE sparse embedding backend (required)
 
-# For PDF plain text extraction (faster)
+### Option 1: CPU
+pip install fastembed
+
+### Option 2: GPU
+pip install fastembed-gpu
+
+## Choose ONE PDF extraction format
+
+### Option 1: Markdown (slower but better quality)
+pip install pymupdf4llm
+
+### Option 2: plain text (faster)
 pip install llama-index-readers-file PyMuPDF
 
-# For PDF Markdown extraction (recommended)
-pip install pymupdf4llm
+## Other file formats if present (docx, xlsx, xlsx)
+pip install docx2txt openpyxl xlrd
 ```
 
 The [build utility][build_document_store.py] supports several options:
@@ -108,6 +127,8 @@ The [build utility][build_document_store.py] supports several options:
 usage: build_document_store.py [-h] [--qdrant-url QDRANT_URL]
                                [--qdrant-collection-name QDRANT_COLLECTION_NAME]
                                [--embedding-model EMBEDDING_MODEL]
+                               [--embedding-text-instruction EMBEDDING_TEXT_INSTRUCTION]
+                               [--ollama-base-url OLLAMA_BASE_URL]
                                [--output-format {plain,markdown}]
                                input_dir
 
@@ -126,6 +147,14 @@ options:
   --embedding-model EMBEDDING_MODEL
                         HuggingFace model for text embeddings (default:
                         sentence-transformers/all-MiniLM-L6-v2)
+  --embedding-text-instruction EMBEDDING_TEXT_INSTRUCTION
+                        Instruction to prepend to text before embedding, e.g.,
+                        'passage:'. Escape sequences like \n are interpreted.
+                        (default: None)
+  --ollama-base-url OLLAMA_BASE_URL
+                        Base URL for Ollama API (recommended). When set, uses
+                        Ollama instead of downloading the embedding model from
+                        HuggingFace. (default: None)
   --output-format {plain,markdown}
                         Output format for document parsing (default: plain)
 ```
