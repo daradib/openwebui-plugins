@@ -4,15 +4,22 @@ author: daradib
 author_url: https://github.com/daradib/
 git_url: https://github.com/daradib/openwebui-plugins.git
 description: Retrieves documents from a Milvus vector store. Supports hybrid search for agentic knowledge base RAG.
-requirements: llama-index-core, llama-index-embeddings-huggingface, llama-index-embeddings-ollama, llama-index-vector-stores-milvus
-version: 0.1.1
+requirements: llama-index-embeddings-ollama, llama-index-vector-stores-milvus
+version: 0.1.2
 license: AGPL-3.0-or-later
 """
 
+
+# Notes:
+#
+# To use HuggingFace embeddings instead of Ollama, edit requirements line above
+# changing llama-index-embeddings-ollama to llama-index-embeddings-huggingface.
+#
 # Connection caching and citation indexing use async locking, but assume a
 # single-node/worker (default). If a multi-node/worker deployment of Open WebUI
 # will call this tool from separate workers, consider modifying it to use Redis
 # for state synchronization.
+
 
 import asyncio
 import codecs
@@ -27,7 +34,6 @@ from llama_index.core.vector_stores import (
     FilterCondition,
     MetadataFilters,
 )
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.vector_stores.milvus import MilvusVectorStore
 from llama_index.vector_stores.milvus.utils import BM25BuiltInFunction
@@ -68,6 +74,7 @@ def get_vector_index(
             query_instruction=query_instruction,
         )
     else:
+        from llama_index.embeddings.huggingface import HuggingFaceEmbedding
         embed_model = HuggingFaceEmbedding(
             model_name=embedding_model,
             query_instruction=query_instruction,
