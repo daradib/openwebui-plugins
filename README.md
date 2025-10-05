@@ -92,10 +92,13 @@ pip install llama-index-vector-stores-qdrant
 
 ## Choose ONE dense embedding backend (required)
 
-### Option 1: Ollama
+### Option 1: Ollama API
 pip install llama-index-embeddings-ollama
 
-### Option 2: HuggingFace
+### Option 2: DeepInfra API
+pip install llama-index-embeddings-deepinfra
+
+### Option 3: HuggingFace SentenceTransformer
 # CPU only:
 pip install torch --index-url https://download.pytorch.org/whl/cpu
 pip install llama-index-embeddings-huggingface

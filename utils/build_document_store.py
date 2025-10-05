@@ -49,10 +49,16 @@ def parse_arguments() -> argparse.Namespace:
         default=None,
         help="Instruction to prepend to text before embedding, e.g., 'passage:'. Escape sequences like \\n are interpreted.",
     )
-    parser.add_argument(
+    provider_group = parser.add_mutually_exclusive_group()
+    provider_group.add_argument(
         "--ollama-base-url",
         default=None,
         help="Base URL for Ollama API. When set, uses Ollama instead of downloading the embedding model from HuggingFace.",
+    )
+    provider_group.add_argument(
+        "--deepinfra-api-key",
+        default=None,
+        help="API key for DeepInfra. When set, uses DeepInfra instead of downloading the embedding model from HuggingFace.",
     )
     parser.add_argument(
         "--format",
@@ -80,13 +86,11 @@ def build_document_store(args: argparse.Namespace) -> None:
 
     # Interpret escape sequences, e.g., literal '\n' into an actual newline.
     if args.embedding_text_instruction:
-        embed_kwargs = {
-            "text_instruction": codecs.decode(
-                args.embedding_text_instruction, "unicode_escape"
-            )
-        }
+        text_instruction = str(
+            codecs.decode(args.embedding_text_instruction, "unicode_escape", "strict")
+        ).strip()
     else:
-        embed_kwargs = {}
+        text_instruction = None
 
     # Initialize embedding model
     if args.ollama_base_url:
@@ -95,14 +99,22 @@ def build_document_store(args: argparse.Namespace) -> None:
         embed_model = OllamaEmbedding(
             model_name=args.embedding_model,
             base_url=args.ollama_base_url,
-            **embed_kwargs,
+            text_instruction=text_instruction,
+        )
+    elif args.deepinfra_api_key:
+        from llama_index.embeddings.deepinfra import DeepInfraEmbeddingModel
+
+        embed_model = DeepInfraEmbeddingModel(
+            model_id=args.embedding_model,
+            api_token=args.deepinfra_api_key,
+            text_prefix=text_instruction + " " if text_instruction else "",
         )
     else:
         from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
         embed_model = HuggingFaceEmbedding(
             model_name=args.embedding_model,
-            **embed_kwargs,
+            text_instruction=text_instruction,
         )
 
     # Initialize vector store
@@ -145,6 +157,8 @@ def build_document_store(args: argparse.Namespace) -> None:
     print(f"Embedding Model: {args.embedding_model}")
     if args.ollama_base_url:
         print(f"Ollama Base URL: {args.ollama_base_url}")
+    elif args.deepinfra_api_key:
+        print("Using DeepInfra API")
 
 
 def main() -> None:
