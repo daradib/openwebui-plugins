@@ -3,9 +3,16 @@
 import argparse
 import codecs
 import multiprocessing
+from os.path import splitext
 from urllib.parse import urlparse
 
-from llama_index.core import SimpleDirectoryReader, StorageContext, VectorStoreIndex
+from llama_index.core import (
+    Document,
+    SimpleDirectoryReader,
+    StorageContext,
+    VectorStoreIndex,
+)
+from llama_index.core.node_parser import MarkdownNodeParser, SentenceSplitter
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 
@@ -62,7 +69,7 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument(
         "--format",
-        choices=["plain", "markdown"],
+        choices=["plain", "markdown", "json"],
         default="plain",
         help="Format to parse PDF files into",
     )
@@ -77,10 +84,26 @@ def build_document_store(args: argparse.Namespace) -> None:
         from llama_index.readers.file import PyMuPDFReader
 
         parser_obj = PyMuPDFReader()
+        file_extractor = {".pdf": parser_obj}
+        transformations = [SentenceSplitter()]
     elif args.format == "markdown":
         from pymupdf4llm import LlamaMarkdownReader
 
         parser_obj = LlamaMarkdownReader()
+        file_extractor = {".pdf": parser_obj}
+        transformations = [MarkdownNodeParser(), SentenceSplitter()]
+    elif args.format == "json":
+        from llama_index.node_parser.docling import DoclingNodeParser
+        from llama_index.readers.docling import DoclingReader
+
+        parser_obj = DoclingReader(export_type=DoclingReader.ExportType.JSON)
+        file_extractor = {
+            ".pdf": parser_obj,
+            ".docx": parser_obj,
+            ".xlsx": parser_obj,
+            ".pptx": parser_obj,
+        }
+        transformations = [DoclingNodeParser(), SentenceSplitter()]
     else:
         raise NotImplementedError
 
@@ -133,7 +156,6 @@ def build_document_store(args: argparse.Namespace) -> None:
     )
 
     # Load documents
-    file_extractor = {".pdf": parser_obj}
     num_workers = multiprocessing.cpu_count()
     documents = SimpleDirectoryReader(
         args.input_dir,
@@ -142,13 +164,26 @@ def build_document_store(args: argparse.Namespace) -> None:
         file_extractor=file_extractor,
     ).load_data(show_progress=True, num_workers=num_workers)
 
+    def is_document_custom_extractor(doc: Document) -> bool:
+        """Return whether a Document uses a custom file_extractor."""
+        file_extension = splitext(doc.metadata["file_name"])[1]
+        return file_extension.lower() in file_extractor
+
     # Build index
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
     VectorStoreIndex.from_documents(
-        documents,
+        [doc for doc in documents if is_document_custom_extractor(doc)],
         storage_context=storage_context,
         embed_model=embed_model,
         show_progress=True,
+        transformations=transformations,
+    )
+    VectorStoreIndex.from_documents(
+        [doc for doc in documents if not is_document_custom_extractor(doc)],
+        storage_context=storage_context,
+        embed_model=embed_model,
+        show_progress=True,
+        transformations=[SentenceSplitter()],
     )
 
     print(f"Successfully built document store with {len(documents)} documents")

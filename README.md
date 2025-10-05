@@ -65,9 +65,9 @@ This tool enables models to iteratively explore knowledge bases through multi-st
 - Use a larger embedding model like the Qwen3-Embedding model series (0.6B, 4B, or 8B). For some suggestions from the [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard), choose English or Multilingual as appropriate, filter the column "Max Tokens" >= 1024 (chunk size), and sort by the "Retrieval" column.
 - Set the appropriate text instruction in the [build utility][build_document_store.py] arguments if needed, e.g., not needed for the Qwen3-Embedding model series.
 - Set the appropriate query instruction in the tool configuration if needed, e.g., for the Qwen3-Embedding model series the query instruction is: `Given a web search query, retrieve relevant passages that answer the query\nQuery:`
-- Parse PDF files into Markdown format instead of plain text.
+- Parse PDF files into Markdown or JSON format instead of plain text.
 - Provide context on the documents in the Open WebUI system prompt (see [prompt example](#example-system-prompt)).
-- Consider processing documents with Docling, changing the chunking strategy, and adding a reranking step after retrieval.
+- Consider adding a reranking step after retrieval.
 
 #### Building the Document Store
 
@@ -78,11 +78,19 @@ Download the [build utility][build_document_store.py].
 python utils/build_document_store.py /path/to/documents
 ```
 
-**Recommended setup** (slower but more accurate):
+**Recommended setup - example #1** (slower, higher quality):
 ```bash
 python utils/build_document_store.py \
   --embedding_model Qwen/Qwen3-Embedding-0.6B \
   --output_format markdown \
+  /path/to/documents
+```
+
+**Recommended setup - example #2** (slowest, highest quality):
+```bash
+python utils/build_document_store.py \
+  --embedding_model Qwen/Qwen3-Embedding-8B \
+  --output_format json \
   /path/to/documents
 ```
 
@@ -101,11 +109,8 @@ pip install llama-index-embeddings-ollama
 pip install llama-index-embeddings-deepinfra
 
 ### Option 3: HuggingFace SentenceTransformer
-# CPU only:
-pip install torch --index-url https://download.pytorch.org/whl/cpu
-pip install llama-index-embeddings-huggingface
-
-# GPU (skip the torch line above if using GPU):
+# Skip the CPU-only torch line below if using GPU
+pip install --index-url https://download.pytorch.org/whl/cpu torch
 pip install llama-index-embeddings-huggingface
 
 ## Choose ONE sparse embedding backend (required)
@@ -118,25 +123,31 @@ pip install fastembed-gpu
 
 ## Choose ONE PDF extraction format
 
-### Option 1: Markdown (slower but better quality)
-pip install pymupdf4llm
-
-### Option 2: plain text (faster)
+### Option 1: plain text (fastest)
 pip install llama-index-readers-file PyMuPDF
 
+### Option 2: Markdown (slower, higher quality)
+pip install pymupdf4llm
+
+### Option 3: JSON (slowest, highest quality)
+# Skip the CPU-only torch line below if using GPU
+pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
+pip install llama-index-readers-docling llama-index-node-parser-docling
+
 ## Other file formats if present (docx, xlsx, xlsx)
-pip install docx2txt openpyxl xlrd
+pip install llama-index-readers-file docx2txt openpyxl xlrd
 ```
 
 The [build utility][build_document_store.py] supports several options:
 
 ```
 usage: build_document_store.py [-h] [--qdrant-url QDRANT_URL]
-                               [--qdrant-collection-name QDRANT_COLLECTION_NAME]
+                               [--qdrant-collection QDRANT_COLLECTION]
+                               [--qdrant-api-key QDRANT_API_KEY]
                                [--embedding-model EMBEDDING_MODEL]
                                [--embedding-text-instruction EMBEDDING_TEXT_INSTRUCTION]
-                               [--ollama-base-url OLLAMA_BASE_URL]
-                               [--output-format {plain,markdown}]
+                               [--ollama-base-url OLLAMA_BASE_URL | --deepinfra-api-key DEEPINFRA_API_KEY]
+                               [--format {plain,markdown,json}]
                                input_dir
 
 Build a document store using LlamaIndex and Qdrant
@@ -149,11 +160,13 @@ options:
   --qdrant-url QDRANT_URL
                         Path to a local Qdrant directory or remote Qdrant
                         instance (default: ./qdrant_db)
-  --qdrant-collection-name QDRANT_COLLECTION_NAME
+  --qdrant-collection QDRANT_COLLECTION
                         Qdrant collection to build (default: llamacollection)
+  --qdrant-api-key QDRANT_API_KEY
+                        API key for remote Qdrant instance (default: None)
   --embedding-model EMBEDDING_MODEL
-                        HuggingFace model for text embeddings (default:
-                        sentence-transformers/all-MiniLM-L6-v2)
+                        Model for dense vector embeddings (default: sentence-
+                        transformers/all-MiniLM-L6-v2)
   --embedding-text-instruction EMBEDDING_TEXT_INSTRUCTION
                         Instruction to prepend to text before embedding, e.g.,
                         'passage:'. Escape sequences like \n are interpreted.
@@ -162,8 +175,12 @@ options:
                         Base URL for Ollama API. When set, uses Ollama instead
                         of downloading the embedding model from HuggingFace.
                         (default: None)
-  --output-format {plain,markdown}
-                        Output format for document parsing (default: plain)
+  --deepinfra-api-key DEEPINFRA_API_KEY
+                        API key for DeepInfra. When set, uses DeepInfra
+                        instead of downloading the embedding model from
+                        HuggingFace. (default: None)
+  --format {plain,markdown,json}
+                        Format to parse PDF files into (default: plain)
 ```
 
 There are also utilities to [copy from Milvus to Qdrant][copy_milvus_to_qdrant.py] if you're looking to migrate from Milvus as well as to [copy Qdrant collections between servers][copy_qdrant_to_qdrant.py].
