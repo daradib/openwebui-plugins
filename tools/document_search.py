@@ -46,6 +46,7 @@ def get_vector_index(
     embedding_query_instruction: Optional[str] = None,
     ollama_base_url: Optional[str] = None,
     deepinfra_api_key: Optional[str] = None,
+    qdrant_api_key: Optional[str] = None,
 ) -> VectorStoreIndex:
     """
     Initialize and return the VectorStoreIndex object.
@@ -58,7 +59,7 @@ def get_vector_index(
         # Workaround for https://github.com/run-llama/llama_index/issues/20002
         QdrantVectorStore.use_old_sparse_encoder = lambda self, collection_name: False
     else:
-        kwargs = {"url": qdrant_url, "api_key": ""}
+        kwargs = {"url": qdrant_url, "api_key": qdrant_api_key or ""}
 
     vector_store = QdrantVectorStore(
         collection_name=qdrant_collection_name,
@@ -222,6 +223,10 @@ class Tools:
         qdrant_collection_name: str = Field(
             default="llamacollection",
             description="Qdrant collection containing both dense vectors and sparse vectors.",
+        )
+        qdrant_api_key: Optional[str] = Field(
+            default=None,
+            description="API key for remote Qdrant instance.",
         )
         embedding_model: str = Field(
             default="sentence-transformers/all-MiniLM-L6-v2",
