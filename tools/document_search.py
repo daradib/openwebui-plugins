@@ -4,7 +4,7 @@ author: daradib
 author_url: https://github.com/daradib/
 git_url: https://github.com/daradib/openwebui-plugins.git
 description: Retrieves documents from a Qdrant vector store. Supports hybrid search for agentic knowledge base RAG.
-requirements: fastembed, llama-index-embeddings-ollama, llama-index-vector-stores-qdrant
+requirements: fastembed, llama-index-embeddings-deepinfra, llama-index-embeddings-ollama, llama-index-vector-stores-qdrant
 version: 0.2.0
 license: AGPL-3.0-or-later
 """
@@ -12,8 +12,8 @@ license: AGPL-3.0-or-later
 
 # Notes:
 #
-# To use HuggingFace embeddings instead of Ollama, edit requirements line above
-# changing llama-index-embeddings-ollama to llama-index-embeddings-huggingface.
+# To use HuggingFace SentenceTransformer instead of Ollama or DeepInfra, add
+# llama-index-embeddings-huggingface to the requirements line above.
 #
 # Connection caching and citation indexing use async locking, but assume a
 # single-node/worker (default). If a multi-node/worker deployment of Open WebUI
@@ -34,7 +34,6 @@ from llama_index.core.vector_stores import (
     FilterCondition,
     MetadataFilters,
 )
-from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from pydantic import BaseModel, Field
 from qdrant_client import AsyncQdrantClient
@@ -46,6 +45,7 @@ def get_vector_index(
     embedding_model: str,
     embedding_query_instruction: Optional[str] = None,
     ollama_base_url: Optional[str] = None,
+    deepinfra_api_key: Optional[str] = None,
 ) -> VectorStoreIndex:
     """
     Initialize and return the VectorStoreIndex object.
@@ -70,14 +70,26 @@ def get_vector_index(
     # Load the specified embedding model from HuggingFace or Ollama.
     # Interpret escape sequences, e.g., literal '\n' into an actual newline.
     if embedding_query_instruction:
-        query_instruction = codecs.decode(embedding_query_instruction, "unicode_escape")
+        query_instruction = str(
+            codecs.decode(embedding_query_instruction, "unicode_escape")
+        ).strip()
     else:
         query_instruction = None
     if ollama_base_url:
+        from llama_index.embeddings.ollama import OllamaEmbedding
+
         embed_model = OllamaEmbedding(
             model_name=embedding_model,
             base_url=ollama_base_url,
             query_instruction=query_instruction,
+        )
+    elif deepinfra_api_key:
+        from llama_index.embeddings.deepinfra import DeepInfraEmbeddingModel
+
+        embed_model = DeepInfraEmbeddingModel(
+            model_id=embedding_model,
+            api_token=deepinfra_api_key,
+            query_prefix=query_instruction + " " if query_instruction else "",
         )
     else:
         from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -217,11 +229,15 @@ class Tools:
         )
         embedding_query_instruction: Optional[str] = Field(
             default=None,
-            description="Instruction to prepend to query before embedding, e.g., 'Query:'. Escape sequences like \\n are interpreted.",
+            description="Instruction to prepend to query before embedding, e.g., 'query:'. Escape sequences like \\n are interpreted.",
         )
         ollama_base_url: Optional[str] = Field(
             default=None,
-            description="Base URL for Ollama API (recommended). When set, uses Ollama instead of downloading the embedding model from HuggingFace.",
+            description="Base URL for Ollama API. When set, uses Ollama instead of downloading the embedding model from HuggingFace.",
+        )
+        deepinfra_api_key: Optional[str] = Field(
+            default=None,
+            description="API key for DeepInfra. When set, uses DeepInfra instead of downloading the embedding model from HuggingFace.",
         )
 
     def __init__(self):
@@ -230,6 +246,8 @@ class Tools:
         Disables automatic citation handling to allow for custom citation events.
         """
         self.valves = self.Valves()
+        if self.valves.ollama_base_url and self.valves.deepinfra_api_key:
+            raise ValueError("Do not set both Ollama base URL and DeepInfra API key")
         self.citation = False
         self._index = None
         self._last_config = None

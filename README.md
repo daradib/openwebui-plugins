@@ -42,7 +42,7 @@ This tool enables models to iteratively explore knowledge bases through multi-st
 - Optionally specify result count (default: 5 results)
 - Optionally specify file name to filter results (default: None)
 - High-performance vector storage (Qdrant)
-- Configurable embedding models (Ollama and HuggingFace)
+- Configurable embedding models (Ollama, DeepInfra, or HuggingFace)
 - Automatic citation generation with sequential indices for inline references
 - Build utility which supports multiple document formats (LlamaIndex, PyMuPDF, etc.)
 
