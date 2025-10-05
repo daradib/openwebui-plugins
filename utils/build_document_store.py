@@ -30,14 +30,14 @@ def parse_arguments() -> argparse.Namespace:
         help="Path to a local Qdrant directory or remote Qdrant instance",
     )
     parser.add_argument(
-        "--qdrant-collection-name",
+        "--qdrant-collection",
         default="llamacollection",
         help="Qdrant collection to build",
     )
     parser.add_argument(
         "--embedding-model",
         default="sentence-transformers/all-MiniLM-L6-v2",
-        help="HuggingFace model for text embeddings",
+        help="Model for dense vector embeddings",
     )
     parser.add_argument(
         "--embedding-text-instruction",
@@ -50,10 +50,10 @@ def parse_arguments() -> argparse.Namespace:
         help="Base URL for Ollama API. When set, uses Ollama instead of downloading the embedding model from HuggingFace.",
     )
     parser.add_argument(
-        "--output-format",
+        "--format",
         choices=["plain", "markdown"],
         default="plain",
-        help="Output format for document parsing",
+        help="Format to parse PDF files into",
     )
 
     return parser.parse_args()
@@ -62,11 +62,11 @@ def parse_arguments() -> argparse.Namespace:
 def build_document_store(args: argparse.Namespace) -> None:
     """Build the document store with the given arguments."""
     # Set up document parser based on output format
-    if args.output_format == "plain":
+    if args.format == "plain":
         from llama_index.readers.file import PyMuPDFReader
 
         parser_obj = PyMuPDFReader()
-    elif args.output_format == "markdown":
+    elif args.format == "markdown":
         from pymupdf4llm import LlamaMarkdownReader
 
         parser_obj = LlamaMarkdownReader()
@@ -109,7 +109,7 @@ def build_document_store(args: argparse.Namespace) -> None:
         kwargs = {"url": args.qdrant_url, "api_key": ""}
 
     vector_store = QdrantVectorStore(
-        collection_name=args.qdrant_collection_name,
+        collection_name=args.qdrant_collection,
         enable_hybrid=True,
         fastembed_sparse_model="Qdrant/bm25",
         **kwargs,
@@ -136,7 +136,7 @@ def build_document_store(args: argparse.Namespace) -> None:
 
     print(f"Successfully built document store with {len(documents)} documents")
     print(f"Qdrant URL: {args.qdrant_url}")
-    print(f"Qdrant Collection Name: {args.qdrant_collection_name}")
+    print(f"Qdrant Collection: {args.qdrant_collection}")
     print(f"Embedding Model: {args.embedding_model}")
     if args.ollama_base_url:
         print(f"Ollama Base URL: {args.ollama_base_url}")
