@@ -62,12 +62,12 @@ This tool enables models to iteratively explore knowledge bases through multi-st
 
 #### Tips for Better Accuracy
 
+- Parse PDF files into Markdown or JSON format instead of unstructured plain text.
 - Use a larger embedding model like the Qwen3-Embedding model series (0.6B, 4B, or 8B). For some suggestions from the [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard), choose English or Multilingual as appropriate, filter the column "Max Tokens" >= 1024 (chunk size), and sort by the "Retrieval" column.
 - Set the appropriate text instruction in the [build utility][build_document_store.py] arguments if needed, e.g., not needed for the Qwen3-Embedding model series.
 - Set the appropriate query instruction in the tool configuration if needed, e.g., for the Qwen3-Embedding model series the query instruction is: `Given a web search query, retrieve relevant passages that answer the query\nQuery:`
-- Parse PDF files into Markdown or JSON format instead of plain text.
+- Use a reranker model like Qwen3-Reranker-8B so that more search candidates can be retrieved.
 - Provide context on the documents in the Open WebUI system prompt (see [prompt example](#example-system-prompt)).
-- Consider adding a reranking step after retrieval.
 
 #### Building the Document Store
 

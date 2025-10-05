@@ -107,8 +107,8 @@ def build_document_store(args: argparse.Namespace) -> None:
     else:
         raise NotImplementedError
 
-    # Interpret escape sequences, e.g., literal '\n' into an actual newline.
     if args.embedding_text_instruction:
+        # Interpret escape sequences, e.g., literal '\n' into an actual newline.
         text_instruction = str(
             codecs.decode(args.embedding_text_instruction, "unicode_escape", "strict")
         ).strip()

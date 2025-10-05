@@ -4,8 +4,8 @@ author: daradib
 author_url: https://github.com/daradib/
 git_url: https://github.com/daradib/openwebui-plugins.git
 description: Retrieves documents from a Qdrant vector store. Supports hybrid search for agentic knowledge base RAG.
-requirements: fastembed, llama-index-embeddings-deepinfra, llama-index-embeddings-ollama, llama-index-vector-stores-qdrant
-version: 0.2.0
+requirements: fastembed, llama-index-embeddings-deepinfra, llama-index-embeddings-ollama, llama-index-llms-ollama, llama-index-vector-stores-qdrant
+version: 0.2.1
 license: AGPL-3.0-or-later
 """
 
@@ -13,21 +13,26 @@ license: AGPL-3.0-or-later
 # Notes:
 #
 # To use HuggingFace SentenceTransformer instead of Ollama or DeepInfra, add
-# llama-index-embeddings-huggingface to the requirements line above.
+# "llama-index-embeddings-huggingface, llama-index-llms-huggingface" to the
+# requirements line above.
 #
 # Connection caching and citation indexing use async locking, but assume a
 # single-node/worker (default). If a multi-node/worker deployment of Open WebUI
 # will call this tool from separate workers, consider modifying it to use Redis
 # for state synchronization.
 
+import aiohttp
 import asyncio
 import codecs
 import json
 import re
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 from urllib.parse import urlparse
 
-from llama_index.core import VectorStoreIndex
+from llama_index.core import QueryBundle, VectorStoreIndex
+from llama_index.core.base.embeddings.base import BaseEmbedding
+from llama_index.core.postprocessor.llm_rerank import LLMRerank
+from llama_index.core.postprocessor.types import BaseNodePostprocessor
 from llama_index.core.schema import NodeWithScore
 from llama_index.core.vector_stores import (
     ExactMatchFilter,
@@ -37,6 +42,181 @@ from llama_index.core.vector_stores import (
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from pydantic import BaseModel, Field
 from qdrant_client import AsyncQdrantClient
+
+
+# Number of candidates to retrieve if reranking:
+CANDIDATES_PER_RESULT = 10
+CANDIDATES_MIN = 20
+CANDIDATES_MAX = 100
+
+# Number of search results:
+RESULTS_MIN = 1
+RESULTS_DEFAULT = 5
+RESULTS_MAX = 20
+
+# Other reranker settings:
+RERANKER_TEMPERATURE = 0
+RERANKER_MAX_TOKENS = 64
+
+
+class DeepInfraReranker(BaseNodePostprocessor):
+    """
+    Reranker using DeepInfra's reranking API.
+    """
+
+    top_n: int = Field(description="Number of top results to return")
+    model_id: str = Field(description="DeepInfra reranker model ID")
+    api_token: str = Field(description="DeepInfra API token")
+    instruction: Optional[str] = Field(
+        default=None,
+        description="Instruction for the reranker model",
+    )
+
+    @classmethod
+    def class_name(cls) -> str:
+        return "DeepInfraReranker"
+
+    def _postprocess_nodes(
+        self,
+        nodes: List[NodeWithScore],
+        query_bundle: Optional[QueryBundle] = None,
+    ) -> List[NodeWithScore]:
+        raise NotImplementedError
+
+    async def _apostprocess_nodes(
+        self,
+        nodes: List[NodeWithScore],
+        query_bundle: Optional[QueryBundle] = None,
+    ) -> List[NodeWithScore]:
+        """
+        Rerank nodes using DeepInfra API.
+        """
+        if not nodes:
+            return []
+
+        query_str = getattr(query_bundle, "query_str")
+        if not query_str:
+            return nodes[: self.top_n]
+
+        # Prepare documents for reranking
+        documents = [node.get_content() for node in nodes]
+        queries = [query_str] * len(documents)
+
+        # Call DeepInfra API
+        url = f"https://api.deepinfra.com/v1/inference/{self.model_id}"
+        headers = {
+            "Authorization": f"bearer {self.api_token}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "queries": queries,
+            "documents": documents,
+        }
+        if self.instruction:
+            payload["instruction"] = self.instruction
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=payload) as response:
+                if not response.ok:
+                    error_text = await response.text()
+                    raise RuntimeError(
+                        f"DeepInfra API error (status {response.status}): {error_text}"
+                    )
+                result = await response.json()
+
+        scores = result.get("scores", [])
+        if len(scores) != len(nodes):
+            raise RuntimeError(
+                f"DeepInfra returned {len(scores)} scores for {len(nodes)} documents"
+            )
+
+        # Pair nodes with scores and sort by score (descending)
+        scored_nodes = list(zip(nodes, scores))
+        scored_nodes.sort(key=lambda x: x[1], reverse=True)
+
+        # Return top_n nodes with updated scores
+        reranked_nodes = []
+        for node, score in scored_nodes[: self.top_n]:
+            node.score = score
+            reranked_nodes.append(node)
+
+        return reranked_nodes
+
+
+def get_embedding_model(
+    embedding_model_name: str,
+    embedding_query_instruction: Optional[str] = None,
+    ollama_base_url: Optional[str] = None,
+    deepinfra_api_key: Optional[str] = None,
+) -> BaseEmbedding:
+    """
+    Initialize and return the model for embedding.
+    """
+    if embedding_query_instruction:
+        # Interpret escape sequences, e.g., literal '\n' into an actual newline.
+        query_instruction = str(
+            codecs.decode(embedding_query_instruction, "unicode_escape")
+        ).strip()
+    else:
+        query_instruction = None
+    if ollama_base_url:
+        from llama_index.embeddings.ollama import OllamaEmbedding
+
+        return OllamaEmbedding(
+            model_name=embedding_model_name,
+            base_url=ollama_base_url,
+            query_instruction=query_instruction,
+        )
+    elif deepinfra_api_key:
+        from llama_index.embeddings.deepinfra import DeepInfraEmbeddingModel
+
+        return DeepInfraEmbeddingModel(
+            model_id=embedding_model_name,
+            api_token=deepinfra_api_key,
+            query_prefix=query_instruction + " " if query_instruction else "",
+        )
+    else:
+        from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+
+        return HuggingFaceEmbedding(
+            model_name=embedding_model_name,
+            query_instruction=query_instruction,
+        )
+
+
+def get_reranker(
+    top_n: int,
+    reranker_model_name: str,
+    ollama_base_url: Optional[str] = None,
+    deepinfra_api_key: Optional[str] = None,
+) -> BaseNodePostprocessor:
+    """
+    Initialize and return the model for reranking.
+    """
+    if ollama_base_url:
+        from llama_index.llms.ollama import Ollama
+
+        llm = Ollama(
+            model=reranker_model_name,
+            base_url=ollama_base_url,
+            temperature=RERANKER_TEMPERATURE,
+            additional_kwargs={"num_predict": RERANKER_MAX_TOKENS},
+        )
+    elif deepinfra_api_key:
+        return DeepInfraReranker(
+            top_n=top_n,
+            model_id=reranker_model_name,
+            api_token=deepinfra_api_key,
+        )
+    else:
+        from llama_index.llms.huggingface import HuggingFaceLLM
+
+        llm = HuggingFaceLLM(
+            model_name=reranker_model_name,
+            max_new_tokens=RERANKER_MAX_TOKENS,
+            generate_kwargs={"temperature": RERANKER_TEMPERATURE},
+        )
+    return LLMRerank(top_n=top_n, llm=llm)
 
 
 def get_vector_index(
@@ -68,37 +248,12 @@ def get_vector_index(
         **kwargs,
     )
 
-    # Load the specified embedding model from HuggingFace or Ollama.
-    # Interpret escape sequences, e.g., literal '\n' into an actual newline.
-    if embedding_query_instruction:
-        query_instruction = str(
-            codecs.decode(embedding_query_instruction, "unicode_escape")
-        ).strip()
-    else:
-        query_instruction = None
-    if ollama_base_url:
-        from llama_index.embeddings.ollama import OllamaEmbedding
-
-        embed_model = OllamaEmbedding(
-            model_name=embedding_model,
-            base_url=ollama_base_url,
-            query_instruction=query_instruction,
-        )
-    elif deepinfra_api_key:
-        from llama_index.embeddings.deepinfra import DeepInfraEmbeddingModel
-
-        embed_model = DeepInfraEmbeddingModel(
-            model_id=embedding_model,
-            api_token=deepinfra_api_key,
-            query_prefix=query_instruction + " " if query_instruction else "",
-        )
-    else:
-        from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-
-        embed_model = HuggingFaceEmbedding(
-            model_name=embedding_model,
-            query_instruction=query_instruction,
-        )
+    embed_model = get_embedding_model(
+        embedding_model_name=embedding_model,
+        embedding_query_instruction=embedding_query_instruction,
+        ollama_base_url=ollama_base_url,
+        deepinfra_api_key=deepinfra_api_key,
+    )
 
     # Create the index object from the existing vector store.
     index = VectorStoreIndex.from_vector_store(
@@ -252,13 +407,17 @@ class Tools:
             default=None,
             description="Instruction to prepend to query before embedding, e.g., 'query:'. Escape sequences like \\n are interpreted.",
         )
+        reranker_model: Optional[str] = Field(
+            default=None,
+            description="Model for reranking search results. When set, retrieves more candidates to improve quality.",
+        )
         ollama_base_url: Optional[str] = Field(
             default=None,
-            description="Base URL for Ollama API. When set, uses Ollama instead of downloading the embedding model from HuggingFace.",
+            description="Base URL for Ollama API. When set, uses Ollama instead of downloading the embedding/reranker models from HuggingFace.",
         )
         deepinfra_api_key: Optional[str] = Field(
             default=None,
-            description="API key for DeepInfra. When set, uses DeepInfra instead of downloading the embedding model from HuggingFace.",
+            description="API key for DeepInfra. When set, uses DeepInfra instead of downloading the embedding/reranker models from HuggingFace.",
         )
 
     def __init__(self):
@@ -277,7 +436,7 @@ class Tools:
     async def retrieve_documents(
         self,
         query: str,
-        top_k: int = 5,
+        top_k: int = RESULTS_DEFAULT,
         file_name: Optional[str] = None,
         __metadata__: Optional[Dict[str, Any]] = None,
         __event_emitter__: Optional[Callable[[Dict], Any]] = None,
@@ -285,11 +444,11 @@ class Tools:
         """
         Retrieve relevant documents from the Qdrant vector store using hybrid search.
 
-        :param query: The natural language search query.
-        :param top_k: The number of top documents to retrieve.
-        :param file_name: The filename to optionally filter results by.
-        :param __metadata__: Injected by Open WebUI with information about the chat.
-        :param __event_emitter__: Injected by Open WebUI to send events to the frontend.
+        :param query: Natural language search query
+        :param top_k: Number of top documents to return
+        :param file_name: Filename to optionally filter results by
+        :param __metadata__: Injected by Open WebUI with information about the chat
+        :param __event_emitter__: Injected by Open WebUI to send events to the frontend
         """
 
         async def emit_status(
@@ -308,8 +467,8 @@ class Tools:
                     }
                 )
 
-        if top_k < 1 or top_k > 20:
-            return "Error: top_k must be between 1 and 20."
+        if top_k < RESULTS_MIN or top_k > RESULTS_MAX:
+            return f"Error: top_k must be between {RESULTS_MIN} and {RESULTS_MAX}."
 
         if file_name:
             parsed_filters = build_filters(file_name)
@@ -328,18 +487,48 @@ class Tools:
                 if not self._index or self._last_config != current_config:
                     if self._index:
                         await self._index.vector_store._aclient.close()
-                    self._index = get_vector_index(**dict(self.valves))
+                    self._index = get_vector_index(
+                        qdrant_url=self.valves.qdrant_url,
+                        qdrant_collection_name=self.valves.qdrant_collection_name,
+                        embedding_model=self.valves.embedding_model,
+                        embedding_query_instruction=self.valves.embedding_query_instruction,
+                        ollama_base_url=self.valves.ollama_base_url,
+                        deepinfra_api_key=self.valves.deepinfra_api_key,
+                        qdrant_api_key=self.valves.qdrant_api_key,
+                    )
                     self._last_config = current_config
+
+            # Determine number of candidates to retrieve if reranking.
+            if self.valves.reranker_model:
+                num_candidates = max(
+                    CANDIDATES_MIN,
+                    min(CANDIDATES_MAX, top_k * CANDIDATES_PER_RESULT),
+                )
+            else:
+                num_candidates = top_k
 
             # Create a query engine with hybrid search mode and async execution.
             retriever = self._index.as_retriever(
                 vector_store_query_mode="hybrid",
-                similarity_top_k=top_k,
+                similarity_top_k=num_candidates,
                 filters=parsed_filters,
                 use_async=True,
             )
 
             nodes = await retriever.aretrieve(query)
+
+            # Rerank if reranker model is configured.
+            if self.valves.reranker_model and nodes:
+                await emit_status(
+                    f"Reranking top {top_k} from {len(nodes)} candidates..."
+                )
+                ranker = get_reranker(
+                    top_n=top_k,
+                    reranker_model_name=self.valves.reranker_model,
+                    ollama_base_url=self.valves.ollama_base_url,
+                    deepinfra_api_key=self.valves.deepinfra_api_key,
+                )
+                nodes = await ranker.apostprocess_nodes(nodes, query_str=query)
 
             if nodes:
                 await emit_status("Search complete.", done=True, hidden=True)
