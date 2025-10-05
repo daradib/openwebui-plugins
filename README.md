@@ -92,7 +92,7 @@ pip install llama-index-vector-stores-qdrant
 
 ## Choose ONE dense embedding backend (required)
 
-### Option 1: Ollama (recommended)
+### Option 1: Ollama
 pip install llama-index-embeddings-ollama
 
 ### Option 2: HuggingFace
@@ -154,9 +154,9 @@ options:
                         'passage:'. Escape sequences like \n are interpreted.
                         (default: None)
   --ollama-base-url OLLAMA_BASE_URL
-                        Base URL for Ollama API (recommended). When set, uses
-                        Ollama instead of downloading the embedding model from
-                        HuggingFace. (default: None)
+                        Base URL for Ollama API. When set, uses Ollama instead
+                        of downloading the embedding model from HuggingFace.
+                        (default: None)
   --output-format {plain,markdown}
                         Output format for document parsing (default: plain)
 ```

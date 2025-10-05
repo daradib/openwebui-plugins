@@ -47,7 +47,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--ollama-base-url",
         default=None,
-        help="Base URL for Ollama API (recommended). When set, uses Ollama instead of downloading the embedding model from HuggingFace.",
+        help="Base URL for Ollama API. When set, uses Ollama instead of downloading the embedding model from HuggingFace.",
     )
     parser.add_argument(
         "--output-format",
