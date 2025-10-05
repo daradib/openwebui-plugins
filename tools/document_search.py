@@ -118,6 +118,19 @@ def build_filters(file_name: str) -> MetadataFilters:
     )
 
 
+def get_node_page(node: NodeWithScore) -> Optional[int]:
+    """
+    Return page number of Node.
+    """
+    page = node.metadata.get("page") or node.metadata.get("source")
+    if not page:
+        try:
+            page = node.metadata["doc_items"][0]["prov"][0]["page_no"]
+        except Exception:
+            pass
+    return page
+
+
 def clean_text(text: str) -> str:
     """
     Remove unwanted formatting and artifacts from text output.
@@ -146,10 +159,10 @@ def clean_node(node: NodeWithScore, citation_id: int) -> dict:
     metadata_fields_to_keep = {
         "file_name",
         "file_type",
-        "page",
-        "source",
+        "last_modified_date",
         "title",
         "total_pages",
+        "headings",
     }
     cleaned_node = {
         "id": citation_id,
@@ -160,6 +173,9 @@ def clean_node(node: NodeWithScore, citation_id: int) -> dict:
         "text": clean_text(node.text),
         "score": node.score,
     }
+    page = get_node_page(node)
+    if page:
+        cleaned_node["metadata"]["page"] = page
     return cleaned_node
 
 
@@ -174,7 +190,7 @@ class CitationIndex:
     ) -> None:
         source_name = node.metadata.get("file_name", "Retrieved Document")
         source_name += f" ({node.id_})"
-        page_number = node.metadata.get("page") or node.metadata.get("source")
+        page_number = get_node_page(node)
         if page_number:
             source_name += f" - p. {page_number}"
         await __event_emitter__(
