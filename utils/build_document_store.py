@@ -35,6 +35,11 @@ def parse_arguments() -> argparse.Namespace:
         help="Qdrant collection to build",
     )
     parser.add_argument(
+        "--qdrant-api-key",
+        default=None,
+        help="API key for remote Qdrant instance",
+    )
+    parser.add_argument(
         "--embedding-model",
         default="sentence-transformers/all-MiniLM-L6-v2",
         help="Model for dense vector embeddings",
@@ -106,7 +111,7 @@ def build_document_store(args: argparse.Namespace) -> None:
         client = QdrantClient(path=parsed_url.path)
         kwargs = {"client": client}
     else:
-        kwargs = {"url": args.qdrant_url, "api_key": ""}
+        kwargs = {"url": args.qdrant_url, "api_key": args.qdrant_api_key or ""}
 
     vector_store = QdrantVectorStore(
         collection_name=args.qdrant_collection,
