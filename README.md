@@ -44,7 +44,7 @@ This tool enables models to iteratively explore knowledge bases through multi-st
 - High-performance vector storage (Qdrant)
 - Configurable embedding models (Ollama, DeepInfra, or HuggingFace)
 - Automatic citation generation with sequential indices for inline references
-- Build utility which supports multiple document formats (LlamaIndex, PyMuPDF, etc.)
+- Build utility which supports multiple document formats (LlamaIndex, PyMuPDF, Docling, etc.)
 
 #### Quick Start
 
@@ -185,9 +185,9 @@ options:
 
 There are also utilities to [copy from Milvus to Qdrant][copy_milvus_to_qdrant.py] if you're looking to migrate from Milvus as well as to [copy Qdrant collections between servers][copy_qdrant_to_qdrant.py].
 
-[build_document_store.py]: utils/build_document_store.py
-[copy_milvus_to_qdrant.py]: utils/copy_milvus_to_qdrant.py
-[copy_qdrant_to_qdrant.py]: utils/copy_qdrant_to_qdrant.py
+[build_document_store.py]: https://github.com/daradib/openwebui-plugins/blob/main/utils/build_document_store.py
+[copy_milvus_to_qdrant.py]: https://github.com/daradib/openwebui-plugins/blob/main/utils/copy_milvus_to_qdrant.py
+[copy_qdrant_to_qdrant.py]: https://github.com/daradib/openwebui-plugins/blob/main/utils/copy_qdrant_to_qdrant.py
 
 #### Example System Prompt
 
