@@ -2,7 +2,6 @@
 
 import argparse
 import codecs
-import multiprocessing
 from os.path import splitext
 from urllib.parse import urlparse
 
@@ -72,6 +71,12 @@ def parse_arguments() -> argparse.Namespace:
         choices=["plain", "markdown", "json"],
         default="plain",
         help="Format to parse PDF files into",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Number of workers to use for parsing documents",
     )
 
     return parser.parse_args()
@@ -156,7 +161,7 @@ def build_document_store(args: argparse.Namespace) -> None:
     )
 
     # Load documents
-    num_workers = multiprocessing.cpu_count()
+    num_workers = args.workers
     documents = SimpleDirectoryReader(
         args.input_dir,
         recursive=True,

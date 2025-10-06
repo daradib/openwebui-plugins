@@ -148,6 +148,7 @@ usage: build_document_store.py [-h] [--qdrant-url QDRANT_URL]
                                [--embedding-text-instruction EMBEDDING_TEXT_INSTRUCTION]
                                [--ollama-base-url OLLAMA_BASE_URL | --deepinfra-api-key DEEPINFRA_API_KEY]
                                [--format {plain,markdown,json}]
+                               [--workers WORKERS]
                                input_dir
 
 Build a document store using LlamaIndex and Qdrant
@@ -181,6 +182,8 @@ options:
                         HuggingFace. (default: None)
   --format {plain,markdown,json}
                         Format to parse PDF files into (default: plain)
+  --workers WORKERS     Number of workers to use for parsing documents
+                        (default: None)
 ```
 
 There are also utilities to [copy from Milvus to Qdrant][copy_milvus_to_qdrant.py] if you're looking to migrate from Milvus as well as to [copy Qdrant collections between servers][copy_qdrant_to_qdrant.py].
