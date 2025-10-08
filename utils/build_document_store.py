@@ -110,7 +110,9 @@ def get_existing_documents(
         Dict mapping file_path to document metadata:
         - file_size: Size of the file
         - last_modified_date: Last modification date
+        - valid: Whether all document IDs have the same metadata
         - doc_ids: Set of document IDs for this file
+        - node_ids: Set of node IDs for this file
     """
     client = vector_store.client
     collection_name = vector_store.collection_name
@@ -122,7 +124,9 @@ def get_existing_documents(
         lambda: {
             "file_size": None,
             "last_modified_date": None,
+            "valid": None,
             "doc_ids": set(),
+            "node_ids": list(),
         }
     )
 
@@ -152,21 +156,24 @@ def get_existing_documents(
             for point in points:
                 doc_id = point.payload["doc_id"]
                 file_path = point.payload["file_path"]
-                if not document_map[file_path]["doc_ids"]:
+                if document_map[file_path]["valid"] is None:
+                    # We have not seen this file yet so add metadata.
                     document_map[file_path]["file_size"] = point.payload["file_size"]
                     document_map[file_path]["last_modified_date"] = point.payload[
                         "last_modified_date"
                     ]
+                    document_map[file_path]["valid"] = True
                 else:
-                    assert (
+                    if (
                         document_map[file_path]["file_size"]
-                        == point.payload["file_size"]
-                    )
-                    assert (
-                        document_map[file_path]["last_modified_date"]
-                        == point.payload["last_modified_date"]
-                    )
+                        != point.payload["file_size"]
+                        or document_map[file_path]["last_modified_date"]
+                        != point.payload["last_modified_date"]
+                    ):
+                        # Metadata is inconsistent.
+                        document_map[file_path]["valid"] = False
                 document_map[file_path]["doc_ids"].add(doc_id)
+                document_map[file_path]["node_ids"].append(point.id)
 
             pbar.update(len(points))
 
@@ -226,9 +233,11 @@ def compare_and_plan_updates(
         if file_path in existing_docs:
             vs_meta = existing_docs[file_path]
             # Compare file_size and last_modified_date (rsync-like)
+            # Also update files with inconsistent metadata
             if (
                 vs_meta["file_size"] != fs_meta["file_size"]
                 or vs_meta["last_modified_date"] != fs_meta["last_modified_date"]
+                or not vs_meta["valid"]
             ):
                 files_to_update.add(file_path)
         else:
@@ -257,11 +266,7 @@ def delete_documents_by_file_paths(
 
     doc_ids_to_delete = []
     for file_path in file_paths:
-        if file_path in existing_docs:
-            doc_ids_to_delete.extend(existing_docs[file_path]["doc_ids"])
-
-    if not doc_ids_to_delete:
-        return
+        doc_ids_to_delete.extend(existing_docs[file_path]["doc_ids"])
 
     print(
         f"{'[DRY RUN] Would delete' if dry_run else 'Deleting'} {len(doc_ids_to_delete)} document nodes from {len(file_paths)} files..."
@@ -277,6 +282,33 @@ def delete_documents_by_file_paths(
                     )
                 ]
             ),
+        )
+
+
+def delete_nodes_by_file_paths(
+    vector_store: QdrantVectorStore,
+    file_paths: Set[str],
+    existing_docs: Dict[str, Dict],
+    dry_run: bool = False,
+) -> None:
+    """Delete all existing document nodes associated with the given file paths."""
+    client = vector_store.client
+    collection_name = vector_store.collection_name
+
+    if not file_paths:
+        return
+
+    node_ids_to_delete = []
+    for file_path in file_paths:
+        node_ids_to_delete.extend(existing_docs[file_path]["node_ids"])
+
+    print(
+        f"{'[DRY RUN] Would delete' if dry_run else 'Deleting'} {len(node_ids_to_delete)} document nodes..."
+    )
+
+    if not dry_run:
+        client.delete(
+            collection_name=collection_name, points_selector=node_ids_to_delete
         )
 
 
@@ -396,9 +428,7 @@ def build_document_store(args: argparse.Namespace) -> None:
     # Prepare files to process (add + update)
     files_to_process = files_to_add | files_to_update
 
-    if not files_to_process:
-        print("\nNo files to add or update. Checking for deletions...")
-    else:
+    if files_to_process:
         print(f"\nProcessing {len(files_to_process)} files...")
 
         # Load only the files that need processing
@@ -413,10 +443,6 @@ def build_document_store(args: argparse.Namespace) -> None:
             """Return whether a Document uses a custom file_extractor."""
             file_extension = os.path.splitext(doc.metadata["file_name"])[1]
             return file_extension.lower() in file_extractor
-
-        # Delete outdated documents
-        if files_to_update:
-            delete_documents_by_file_paths(vector_store, files_to_update, existing_docs)
 
         # Build index
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
@@ -440,6 +466,10 @@ def build_document_store(args: argparse.Namespace) -> None:
     # Delete documents that are no longer in filesystem
     if files_to_delete:
         delete_documents_by_file_paths(vector_store, files_to_delete, existing_docs)
+
+    # Delete outdated documents
+    if files_to_update:
+        delete_nodes_by_file_paths(vector_store, files_to_update, existing_docs)
 
     print(f"\n{'=' * 60}")
     print("Summary:")
