@@ -44,7 +44,7 @@ This tool enables models to iteratively explore knowledge bases through multi-st
 - High-performance vector storage (Qdrant)
 - Configurable embedding models (Ollama, DeepInfra, or HuggingFace)
 - Automatic citation generation with sequential indices for inline references
-- Build utility which supports multiple document formats (LlamaIndex, PyMuPDF, Docling, etc.)
+- Build utility which supports multiple document extractors (LlamaIndex, PyMuPDF4LLM, or Docling) and efficient incremental updates to the vector store (new, modified, or deleted files)
 
 #### Quick Start
 
@@ -148,7 +148,7 @@ usage: build_document_store.py [-h] [--qdrant-url QDRANT_URL]
                                [--embedding-text-instruction EMBEDDING_TEXT_INSTRUCTION]
                                [--ollama-base-url OLLAMA_BASE_URL | --deepinfra-api-key DEEPINFRA_API_KEY]
                                [--format {plain,markdown,json}]
-                               [--workers WORKERS]
+                               [--workers WORKERS] [--dry-run]
                                input_dir
 
 Build a document store using LlamaIndex and Qdrant
@@ -184,6 +184,9 @@ options:
                         Format to parse PDF files into (default: plain)
   --workers WORKERS     Number of workers to use for parsing documents
                         (default: None)
+  --dry-run             Compare files between input directory and Qdrant
+                        collection without actually adding or deleting
+                        documents (default: False)
 ```
 
 There are also utilities to [copy from Milvus to Qdrant][copy_milvus_to_qdrant.py] if you're looking to migrate from Milvus as well as to [copy Qdrant collections between servers][copy_qdrant_to_qdrant.py].
