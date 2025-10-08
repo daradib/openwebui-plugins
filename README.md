@@ -97,8 +97,8 @@ python utils/build_document_store.py \
 To install the required dependencies for the [build utility][build_document_store.py]:
 
 ```bash
-## Core dependency (required)
-pip install llama-index-vector-stores-qdrant
+## Core dependencies (required)
+pip install llama-index-readers-file llama-index-vector-stores-qdrant
 
 ## Choose ONE dense embedding backend (required)
 
@@ -124,7 +124,7 @@ pip install fastembed-gpu
 ## Choose ONE PDF extraction format
 
 ### Option 1: plain text (fastest)
-pip install llama-index-readers-file PyMuPDF
+pip install PyMuPDF
 
 ### Option 2: Markdown (slower, higher quality)
 pip install pymupdf4llm
@@ -134,8 +134,8 @@ pip install pymupdf4llm
 pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
 pip install llama-index-readers-docling llama-index-node-parser-docling
 
-## Other file formats if present (docx, xlsx, xlsx)
-pip install llama-index-readers-file docx2txt openpyxl xlrd
+## Support for other file formats if present
+pip install docx2txt
 ```
 
 The [build utility][build_document_store.py] supports several options:

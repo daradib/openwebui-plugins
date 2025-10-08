@@ -18,6 +18,15 @@ from qdrant_client import QdrantClient
 
 # For dependency installation instructions see README.md
 
+# List of file extensions to load.
+# Other formats like csv, pptx, xlsx could be added if they're useful.
+ALLOWED_EXTENSIONS = [
+    ".docx",
+    ".md",
+    ".pdf",
+    ".txt",
+]
+
 
 def parse_arguments() -> argparse.Namespace:
     """Parse and return command-line arguments."""
@@ -165,6 +174,7 @@ def build_document_store(args: argparse.Namespace) -> None:
     documents = SimpleDirectoryReader(
         args.input_dir,
         recursive=True,
+        required_exts=ALLOWED_EXTENSIONS,
         filename_as_id=True,
         file_extractor=file_extractor,
     ).load_data(show_progress=True, num_workers=num_workers)
