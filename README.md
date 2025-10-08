@@ -225,7 +225,7 @@ This tool empowers models to conduct web research through iterative search strat
 - Access web search results or AI-generated answers
 - Date range filtering
 - Domain inclusion/exclusion
-- Automatic citation generation
+- Automatic citation generation with sequential indices for inline references
 
 #### Setup
 

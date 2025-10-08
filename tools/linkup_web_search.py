@@ -5,16 +5,18 @@ author_url: https://github.com/daradib/
 git_url: https://github.com/daradib/openwebui-plugins.git
 description: Search the web using the Linkup API. Provides real-time web search capabilities with citations.
 requirements: linkup-sdk
-version: 0.1.4
+version: 0.1.5
 license: AGPL-3.0-or-later
 """
 
+import asyncio
 from datetime import date
 import json
+from hashlib import sha1
 import re
 from typing import Any, Callable, Dict, Optional
 
-from linkup import LinkupClient
+from linkup import LinkupClient, LinkupSearchTextResult
 from pydantic import BaseModel, Field
 
 
@@ -26,6 +28,54 @@ def clean(s: str) -> str:
     """Remove citations from string."""
     # Workaround for https://github.com/open-webui/open-webui/issues/17062
     return CITATION_PATTERN.sub("", s)
+
+
+class CitationIndex:
+    def __init__(self):
+        self._set = set()
+        self._count = 0
+        self._lock = asyncio.Lock()
+
+    async def emit_citation(
+        self, result: LinkupSearchTextResult, __event_emitter__: Callable[[Dict], Any]
+    ) -> None:
+        content = getattr(result, "content", "")
+        url = getattr(result, "url", "")
+        await __event_emitter__(
+            {
+                "type": "citation",
+                "data": {
+                    "document": [content],
+                    "metadata": [
+                        {
+                            "source": url,
+                        }
+                    ],
+                    "source": {"name": url},
+                },
+            }
+        )
+
+    async def add_if_not_exists(
+        self,
+        result: LinkupSearchTextResult,
+        __event_emitter__: Optional[Callable[[Dict], Any]] = None,
+    ) -> Optional[int]:
+        # Lock required to prevent race conditions in check-and-set operation
+        # and to ensure citations are emitted in citation_id order.
+        content = getattr(result, "content", "").strip()
+        if not content:
+            return None
+        content_hash = sha1(content.encode()).hexdigest()
+        async with self._lock:
+            if content_hash in self._set:
+                return None
+            else:
+                if __event_emitter__:
+                    await self.emit_citation(result, __event_emitter__)
+                self._set.add(content_hash)
+                self._count += 1
+                return self._count
 
 
 class Tools:
@@ -43,6 +93,7 @@ class Tools:
         self.valves = self.Valves()
         # Disable automatic citations since we're handling them manually
         self.citation = False
+        self._lock = asyncio.Lock()
 
     async def linkup_web_search(
         self,
@@ -51,6 +102,7 @@ class Tools:
         to_date: Optional[str] = None,
         exclude_domains: Optional[list[str]] = None,
         include_domains: Optional[list[str]] = None,
+        __metadata__: Optional[Dict[str, Any]] = None,
         __event_emitter__: Optional[Callable[[Dict], Any]] = None,
     ) -> str:
         # The docstring below is based on the official MCP server schema
@@ -68,7 +120,9 @@ class Tools:
         :param include_domains: List of domains to only return search results for
         """
 
-        async def emit_status(description: str, done: bool = False):
+        async def emit_status(
+            description: str, done: bool = False, hidden: bool = False
+        ):
             """Helper function to emit status updates."""
             if __event_emitter__:
                 await __event_emitter__(
@@ -77,7 +131,7 @@ class Tools:
                         "data": {
                             "description": description,
                             "done": done,
-                            "hidden": False,
+                            "hidden": hidden,
                         },
                     }
                 )
@@ -115,7 +169,7 @@ class Tools:
                 include_domains=include_domains,
             )
 
-            await emit_status("Processing search results", done=False)
+            await emit_status("Search complete", done=True, hidden=True)
 
             # Handle different output types
             if self.valves.output_type == "sourcedAnswer":
@@ -153,8 +207,6 @@ class Tools:
                                 }
                             )
 
-                await emit_status("Search completed successfully", done=True)
-
                 # Return the main answer and list of sources
                 answer_with_sources = {
                     "answer": answer,
@@ -164,33 +216,36 @@ class Tools:
 
             elif self.valves.output_type == "searchResults":
                 results = getattr(response, "results", [])
-
                 if not results:
                     await emit_status("No results found", done=True)
                     return "No search results found for the given query."
 
-                if __event_emitter__:
-                    # Emit each search result as a citation
-                    for i, result in enumerate(results, 1):
-                        content = getattr(result, "content", "")
-                        url = getattr(result, "url", "")
-                        title = getattr(result, "name", f"Search Result {i}")
+                if __metadata__:
+                    # Lock required to prevent concurrent requests from creating
+                    # separate CitationIndex instances, which would cause citation_id
+                    # collisions and loss of citation state across the conversation.
+                    if "linkup_web_search_citation_index" not in __metadata__:
+                        async with self._lock:
+                            if "linkup_web_search_citation_index" not in __metadata__:
+                                __metadata__["linkup_web_search_citation_index"] = (
+                                    CitationIndex()
+                                )
+                    citation_index = __metadata__["linkup_web_search_citation_index"]
+                else:
+                    citation_index = CitationIndex()
 
-                        if content:
-                            await __event_emitter__(
-                                {
-                                    "type": "citation",
-                                    "data": {
-                                        "document": [content],
-                                        "metadata": [{"source": url}],
-                                        "source": {"name": title, "url": url},
-                                    },
-                                }
-                            )
-
-                await emit_status("Search completed successfully", done=True)
-
-                return clean(str(response))
+                # Return a list of results with sequential numbers corresponding
+                # to the citations that are emitted
+                results_with_ids = []
+                for result in results:
+                    citation_id = await citation_index.add_if_not_exists(
+                        result, __event_emitter__
+                    )
+                    if citation_id:
+                        result_with_id = {"id": citation_id}
+                        result_with_id.update(result)
+                        results_with_ids.append(result_with_id)
+                return clean(json.dumps(results_with_ids))
 
             else:
                 raise NotImplementedError
