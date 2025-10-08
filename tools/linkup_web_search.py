@@ -5,7 +5,7 @@ author_url: https://github.com/daradib/
 git_url: https://github.com/daradib/openwebui-plugins.git
 description: Search the web using the Linkup API. Provides real-time web search capabilities with citations.
 requirements: linkup-sdk
-version: 0.1.3
+version: 0.1.4
 license: AGPL-3.0-or-later
 """
 
@@ -18,7 +18,8 @@ from linkup import LinkupClient
 from pydantic import BaseModel, Field
 
 
-CITATION_PATTERN = re.compile(r"\[\d+\]")
+# Updated regular expression for Open WebUI 0.6.33.
+CITATION_PATTERN = re.compile(r"\[[\d,\s]+\]")
 
 
 def clean(s: str) -> str:
