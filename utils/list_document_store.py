@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 
 import argparse
-from collections import defaultdict
 import csv
+from collections import defaultdict
+from collections.abc import Iterator
 from typing import Optional
 from urllib.parse import urlparse
 
 from qdrant_client import QdrantClient
+from qdrant_client.conversions.common_types import Record
 from tqdm import tqdm
-
 
 DOCUMENT_FIELD = "doc_id"
 METADATA_FIELDS = [
@@ -36,7 +37,9 @@ def get_qdrant_client(qdrant_url: str, api_key: Optional[str] = None) -> QdrantC
     return client
 
 
-def get_qdrant_points(client: QdrantClient, collection_name: str, batch_size: int):
+def get_qdrant_points(
+    client: QdrantClient, collection_name: str, batch_size: int
+) -> Iterator[Record]:
     offset = None
     while True:
         points, next_page_offset = client.scroll(
@@ -46,8 +49,7 @@ def get_qdrant_points(client: QdrantClient, collection_name: str, batch_size: in
             with_payload=[DOCUMENT_FIELD] + METADATA_FIELDS,
             with_vectors=False,
         )
-        for point in points:
-            yield point
+        yield from points
         if next_page_offset is None:
             break
         offset = next_page_offset

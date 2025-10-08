@@ -2,10 +2,10 @@
 
 import argparse
 import codecs
-from datetime import datetime, timezone
 import os
 from collections import defaultdict
-from typing import Dict, Set
+from datetime import datetime, timezone
+from typing import Never
 from urllib.parse import urlparse
 
 from llama_index.core import (
@@ -14,11 +14,10 @@ from llama_index.core import (
     StorageContext,
     VectorStoreIndex,
 )
-from tqdm import tqdm
 from llama_index.core.node_parser import MarkdownNodeParser, SentenceSplitter
 from llama_index.vector_stores.qdrant import QdrantVectorStore
-from qdrant_client import models, QdrantClient
-
+from qdrant_client import QdrantClient, models
+from tqdm import tqdm
 
 # For dependency installation instructions see README.md
 
@@ -102,7 +101,7 @@ def parse_arguments() -> argparse.Namespace:
 
 def get_existing_documents(
     vector_store: QdrantVectorStore, batch_size: int = 1000
-) -> Dict[str, Dict]:
+) -> dict[str, dict]:
     """
     Retrieve existing documents from Qdrant collection.
 
@@ -185,7 +184,7 @@ def get_existing_documents(
     return dict(sorted(document_map.items(), key=lambda item: item[0]))
 
 
-def get_filesystem_files(input_dir: str) -> Dict[str, Dict]:
+def get_filesystem_files(input_dir: str) -> dict[str, dict]:
     """
     Scan filesystem and return file metadata.
 
@@ -195,12 +194,12 @@ def get_filesystem_files(input_dir: str) -> Dict[str, Dict]:
         - last_modified_date: Last modification date UTC string (YYYY-MM-DD)
     """
 
-    def raise_error(e):
+    def raise_error(e: Exception) -> Never:
         raise e
 
     filesystem_files = {}
 
-    for root, dirs, files in os.walk(input_dir, onerror=raise_error):
+    for root, _dirs, files in os.walk(input_dir, onerror=raise_error):
         for file in files:
             file_extension = os.path.splitext(file)[1].lower()
             if file_extension in ALLOWED_EXTENSIONS:
@@ -216,9 +215,9 @@ def get_filesystem_files(input_dir: str) -> Dict[str, Dict]:
 
 
 def compare_and_plan_updates(
-    existing_docs: Dict[str, Dict],
-    filesystem_files: Dict[str, Dict],
-) -> tuple[Set[str], Set[str], Set[str]]:
+    existing_docs: dict[str, dict],
+    filesystem_files: dict[str, dict],
+) -> tuple[set[str], set[str], set[str]]:
     """
     Compare existing documents with filesystem and plan updates.
 
@@ -257,8 +256,8 @@ def compare_and_plan_updates(
 
 def delete_documents_by_file_paths(
     vector_store: QdrantVectorStore,
-    file_paths: Set[str],
-    existing_docs: Dict[str, Dict],
+    file_paths: set[str],
+    existing_docs: dict[str, dict],
     dry_run: bool = False,
 ) -> None:
     """Delete all documents associated with the given file paths."""
@@ -291,8 +290,8 @@ def delete_documents_by_file_paths(
 
 def delete_nodes_by_file_paths(
     vector_store: QdrantVectorStore,
-    file_paths: Set[str],
-    existing_docs: Dict[str, Dict],
+    file_paths: set[str],
+    existing_docs: dict[str, dict],
     dry_run: bool = False,
 ) -> None:
     """Delete all existing document nodes associated with the given file paths."""

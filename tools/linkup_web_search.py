@@ -10,15 +10,14 @@ license: AGPL-3.0-or-later
 """
 
 import asyncio
-from datetime import date
 import json
-from hashlib import sha1
 import re
-from typing import Any, Callable, Dict, Optional
+from datetime import date
+from hashlib import sha1
+from typing import Any, Callable, Optional
 
 from linkup import LinkupClient, LinkupSearchTextResult
 from pydantic import BaseModel, Field
-
 
 # Updated regular expression for Open WebUI 0.6.33.
 CITATION_PATTERN = re.compile(r"\[[\d,\s]+\]")
@@ -31,13 +30,13 @@ def clean(s: str) -> str:
 
 
 class CitationIndex:
-    def __init__(self):
+    def __init__(self) -> None:
         self._set = set()
         self._count = 0
         self._lock = asyncio.Lock()
 
     async def emit_citation(
-        self, result: LinkupSearchTextResult, __event_emitter__: Callable[[Dict], Any]
+        self, result: LinkupSearchTextResult, __event_emitter__: Callable[[dict], Any]
     ) -> None:
         content = getattr(result, "content", "")
         url = getattr(result, "url", "")
@@ -59,7 +58,7 @@ class CitationIndex:
     async def add_if_not_exists(
         self,
         result: LinkupSearchTextResult,
-        __event_emitter__: Optional[Callable[[Dict], Any]] = None,
+        __event_emitter__: Optional[Callable[[dict], Any]] = None,
     ) -> Optional[int]:
         # Lock required to prevent race conditions in check-and-set operation
         # and to ensure citations are emitted in citation_id order.
@@ -88,7 +87,7 @@ class Tools:
             description="Choose between 'searchResults' for model grounding or 'sourcedAnswer' for a direct answer",
         )
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the Linkup Web Search Tool."""
         self.valves = self.Valves()
         # Disable automatic citations since we're handling them manually
@@ -102,8 +101,8 @@ class Tools:
         to_date: Optional[str] = None,
         exclude_domains: Optional[list[str]] = None,
         include_domains: Optional[list[str]] = None,
-        __metadata__: Optional[Dict[str, Any]] = None,
-        __event_emitter__: Optional[Callable[[Dict], Any]] = None,
+        __metadata__: Optional[dict[str, Any]] = None,
+        __event_emitter__: Optional[Callable[[dict], Any]] = None,
     ) -> str:
         # The docstring below is based on the official MCP server schema
         # without configurable search depth (always standard) and additional
@@ -122,7 +121,7 @@ class Tools:
 
         async def emit_status(
             description: str, done: bool = False, hidden: bool = False
-        ):
+        ) -> None:
             """Helper function to emit status updates."""
             if __event_emitter__:
                 await __event_emitter__(

@@ -21,14 +21,14 @@ license: AGPL-3.0-or-later
 # will call this tool from separate workers, consider modifying it to use Redis
 # for state synchronization.
 
-import aiohttp
 import asyncio
 import codecs
 import json
 import re
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Optional
 from urllib.parse import urlparse
 
+import aiohttp
 from llama_index.core import QueryBundle, VectorStoreIndex
 from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.core.postprocessor.llm_rerank import LLMRerank
@@ -42,7 +42,6 @@ from llama_index.core.vector_stores import (
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from pydantic import BaseModel, Field
 from qdrant_client import AsyncQdrantClient
-
 
 # Number of candidates to retrieve if reranking:
 CANDIDATES_PER_RESULT = 10
@@ -78,23 +77,23 @@ class DeepInfraReranker(BaseNodePostprocessor):
 
     def _postprocess_nodes(
         self,
-        nodes: List[NodeWithScore],
+        nodes: list[NodeWithScore],
         query_bundle: Optional[QueryBundle] = None,
-    ) -> List[NodeWithScore]:
+    ) -> list[NodeWithScore]:
         raise NotImplementedError
 
     async def _apostprocess_nodes(
         self,
-        nodes: List[NodeWithScore],
+        nodes: list[NodeWithScore],
         query_bundle: Optional[QueryBundle] = None,
-    ) -> List[NodeWithScore]:
+    ) -> list[NodeWithScore]:
         """
         Rerank nodes using DeepInfra API.
         """
         if not nodes:
             return []
 
-        query_str = getattr(query_bundle, "query_str")
+        query_str = getattr(query_bundle, "query_str", "")
         if not query_str:
             return nodes[: self.top_n]
 
@@ -336,13 +335,13 @@ def clean_node(node: NodeWithScore, citation_id: int) -> dict:
 
 
 class CitationIndex:
-    def __init__(self):
+    def __init__(self) -> None:
         self._set = set()
         self._count = 0
         self._lock = asyncio.Lock()
 
     async def emit_citation(
-        self, node, __event_emitter__: Callable[[Dict], Any]
+        self, node: NodeWithScore, __event_emitter__: Callable[[dict], Any]
     ) -> None:
         source_name = node.metadata.get("file_name", "Retrieved Document")
         source_name += f" ({node.id_})"
@@ -367,7 +366,7 @@ class CitationIndex:
     async def add_if_not_exists(
         self,
         node: NodeWithScore,
-        __event_emitter__: Optional[Callable[[Dict], Any]] = None,
+        __event_emitter__: Optional[Callable[[dict], Any]] = None,
     ) -> Optional[int]:
         # Lock required to prevent race conditions in check-and-set operation
         # and to ensure citations are emitted in citation_id order.
@@ -421,7 +420,7 @@ class Tools:
             description="API key for DeepInfra. When set, uses DeepInfra instead of downloading the embedding/reranker models from HuggingFace.",
         )
 
-    def __init__(self):
+    def __init__(self) -> None:
         """
         Initialize the tool and its valves.
         Disables automatic citation handling to allow for custom citation events.
@@ -439,8 +438,8 @@ class Tools:
         query: str,
         top_k: int = RESULTS_DEFAULT,
         file_name: Optional[str] = None,
-        __metadata__: Optional[Dict[str, Any]] = None,
-        __event_emitter__: Optional[Callable[[Dict], Any]] = None,
+        __metadata__: Optional[dict[str, Any]] = None,
+        __event_emitter__: Optional[Callable[[dict], Any]] = None,
     ) -> str:
         """
         Retrieve relevant documents from the Qdrant vector store using hybrid search.
@@ -453,7 +452,7 @@ class Tools:
         """
 
         async def emit_status(
-            description: str, done: bool = False, hidden=False
+            description: str, done: bool = False, hidden: bool = False
         ) -> None:
             """Helper function to emit status updates."""
             if __event_emitter__:

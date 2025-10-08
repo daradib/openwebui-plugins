@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
 import argparse
+from collections.abc import Iterator
 from urllib.parse import urlparse
 
 from llama_index.core.schema import TextNode
 from llama_index.vector_stores.milvus import MilvusVectorStore
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
-
 
 # Installation Notes:
 #
@@ -58,7 +58,9 @@ def get_qdrant_vector_store(
     return vector_store
 
 
-def query_all_milvus(milvus_vector_store: MilvusVectorStore, batch_size=1000):
+def query_all_milvus(
+    milvus_vector_store: MilvusVectorStore, batch_size: int = 1000
+) -> Iterator[dict]:
     """
     Fetch all documents from Milvus.
     """
@@ -73,8 +75,7 @@ def query_all_milvus(milvus_vector_store: MilvusVectorStore, batch_size=1000):
         )
         if not results:
             break
-        for item in results:
-            yield item
+        yield from results
         offset += batch_size
 
 

@@ -12,12 +12,10 @@ license: MIT
 
 import json
 import re
-from typing import Optional, Callable, Any, Dict
+from typing import Any, Callable, Optional
 
 import aiohttp
-from aiohttp import ClientTimeout
 from pydantic import BaseModel, Field
-
 
 CITATION_PATTERN = re.compile(r"\[\d+\]")
 
@@ -42,11 +40,11 @@ class Tools:
             description="Model to use for search",
         )
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.valves = self.Valves()
 
     async def perplexity_web_search(
-        self, query: str, __event_emitter__: Optional[Callable[[Dict], Any]] = None
+        self, query: str, __event_emitter__: Optional[Callable[[dict], Any]] = None
     ) -> str:
         """
         Search the web using Perplexity AI
@@ -59,7 +57,7 @@ class Tools:
         # Status emitter helper
         async def emit_status(
             description: str, status: str = "in_progress", done: bool = False
-        ):
+        ) -> None:
             if __event_emitter__:
                 await __event_emitter__(
                     {
@@ -96,7 +94,7 @@ class Tools:
         try:
             await emit_status("Processing search results...", "processing")
 
-            timeout = ClientTimeout(total=30)
+            timeout = aiohttp.ClientTimeout(total=30)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(
                     f"{self.valves.openrouter_api_base_url}/chat/completions",

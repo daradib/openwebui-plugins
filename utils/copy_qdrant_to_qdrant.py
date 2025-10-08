@@ -6,7 +6,6 @@ from urllib.parse import urlparse
 
 from qdrant_client import QdrantClient
 
-
 # Installation Notes:
 #
 # Core dependencies
