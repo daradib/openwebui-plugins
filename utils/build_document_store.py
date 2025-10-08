@@ -194,9 +194,13 @@ def get_filesystem_files(input_dir: str) -> Dict[str, Dict]:
         - file_size: Size of the file in bytes
         - last_modified_date: Last modification date UTC string (YYYY-MM-DD)
     """
+
+    def raise_error(e):
+        raise e
+
     filesystem_files = {}
 
-    for root, dirs, files in os.walk(input_dir):
+    for root, dirs, files in os.walk(input_dir, onerror=raise_error):
         for file in files:
             file_extension = os.path.splitext(file)[1].lower()
             if file_extension in ALLOWED_EXTENSIONS:
@@ -389,13 +393,13 @@ def build_document_store(args: argparse.Namespace) -> None:
         **vs_kwargs,
     )
 
-    # Get existing documents from vector store
-    existing_docs = get_existing_documents(vector_store)
-
     # Scan filesystem
     print(f"Scanning filesystem at '{args.input_dir}'...")
     filesystem_files = get_filesystem_files(args.input_dir)
     print(f"Found {len(filesystem_files)} files in filesystem.")
+
+    # Get existing documents from vector store
+    existing_docs = get_existing_documents(vector_store)
 
     # Compare and plan updates
     files_to_add, files_to_update, files_to_delete = compare_and_plan_updates(
