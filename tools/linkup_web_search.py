@@ -5,7 +5,7 @@ author_url: https://github.com/daradib/
 git_url: https://github.com/daradib/openwebui-plugins.git
 description: Search the web using the Linkup API. Provides real-time web search capabilities with citations.
 requirements: linkup-sdk
-version: 0.1.5
+version: 0.1.6
 license: AGPL-3.0-or-later
 """
 
@@ -24,9 +24,10 @@ CITATION_PATTERN = re.compile(r"\[[\d,\s]+\]")
 
 
 def clean(s: str) -> str:
-    """Remove citations from string."""
+    """Remove citation references and backticks from string."""
     # Workaround for https://github.com/open-webui/open-webui/issues/17062
-    return CITATION_PATTERN.sub("", s)
+    # Unclosed backticks seem to cause issues with citation rendering.
+    return CITATION_PATTERN.sub("", s.replace("`", ""))
 
 
 class CitationIndex:

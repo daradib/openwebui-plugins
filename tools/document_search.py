@@ -5,7 +5,7 @@ author_url: https://github.com/daradib/
 git_url: https://github.com/daradib/openwebui-plugins.git
 description: Retrieves documents from a Qdrant vector store. Supports hybrid search for agentic knowledge base RAG.
 requirements: fastembed, llama-index-embeddings-deepinfra, llama-index-embeddings-ollama, llama-index-llms-ollama, llama-index-vector-stores-qdrant
-version: 0.2.2
+version: 0.2.3
 license: AGPL-3.0-or-later
 """
 
@@ -299,6 +299,9 @@ def clean_text(text: str) -> str:
     text = re.sub(r" +", " ", text)
     # Replace 4 or more periods with just 3 periods.
     text = re.sub(r"\.{4,}", "...", text)
+    # Remove backticks.
+    # Unclosed backticks seem to cause issues with citation rendering.
+    text = text.replace("`", "")
     # Remove citation references.
     # Workaround for https://github.com/open-webui/open-webui/issues/17062
     # with updated regular expression for Open WebUI 0.6.33.
