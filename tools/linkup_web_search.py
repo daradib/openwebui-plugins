@@ -5,7 +5,7 @@ author_url: https://github.com/daradib/
 git_url: https://github.com/daradib/openwebui-plugins.git
 description: Search the web using the Linkup API. Provides real-time web search capabilities with citations.
 requirements: linkup-sdk
-version: 0.1.6
+version: 0.1.7
 license: AGPL-3.0-or-later
 """
 
@@ -32,26 +32,21 @@ def clean(s: str) -> str:
 
 class CitationIndex:
     def __init__(self) -> None:
-        self._set = set()
-        self._count = 0
+        # _sources maps a URL to a tuple: (citation_id, set_of_content_hashes)
+        self._sources: dict[str, tuple[int, set[str]]] = {}
         self._lock = asyncio.Lock()
 
     async def emit_citation(
         self, result: LinkupSearchTextResult, __event_emitter__: Callable[[dict], Any]
     ) -> None:
-        content = getattr(result, "content", "")
-        url = getattr(result, "url", "")
+        """Emit a citation event."""
         await __event_emitter__(
             {
                 "type": "citation",
                 "data": {
-                    "document": [content],
-                    "metadata": [
-                        {
-                            "source": url,
-                        }
-                    ],
-                    "source": {"name": url},
+                    "document": [result.content],
+                    "metadata": [{"source": result.url}],
+                    "source": {"name": result.url},
                 },
             }
         )
@@ -61,21 +56,33 @@ class CitationIndex:
         result: LinkupSearchTextResult,
         __event_emitter__: Optional[Callable[[dict], Any]] = None,
     ) -> Optional[int]:
-        # Lock required to prevent race conditions in check-and-set operation
-        # and to ensure citations are emitted in citation_id order.
-        content = getattr(result, "content", "").strip()
+        """
+        Add a citation if it's unique and return its citation number.
+
+        - Emits a citation if the URL or content is new.
+        - Returns a sequential number based on the URL's first appearance.
+        - Returns None if the content is empty or already cited.
+        """
+        content = result.content.strip()
         if not content:
             return None
         content_hash = sha1(content.encode()).hexdigest()
+        url = result.url or content_hash
+        # Lock required to prevent race conditions in check-and-set operation
+        # and to ensure citations are emitted in citation_id order.
         async with self._lock:
-            if content_hash in self._set:
-                return None
+            if url in self._sources:
+                existing_num, content_hashes = self._sources[url]
+                if content_hash in content_hashes:
+                    return None
+                citation_num = existing_num
+                content_hashes.add(content_hash)
             else:
-                if __event_emitter__:
-                    await self.emit_citation(result, __event_emitter__)
-                self._set.add(content_hash)
-                self._count += 1
-                return self._count
+                citation_num = len(self._sources) + 1
+                self._sources[url] = (citation_num, {content_hash})
+            if __event_emitter__:
+                await self.emit_citation(result, __event_emitter__)
+            return citation_num
 
 
 class Tools:
