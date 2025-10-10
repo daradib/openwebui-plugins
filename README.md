@@ -182,7 +182,8 @@ options:
                         HuggingFace. (default: None)
   --format {plain,markdown,json}
                         Format to parse PDF files into (default: plain)
-  --workers WORKERS     Number of workers to use for parsing documents
+  --workers WORKERS     Number of workers to use for parsing documents,
+                        generating embeddings, and saving to the vector store
                         (default: None)
   --dry-run             Compare files between input directory and Qdrant
                         collection without actually adding or deleting

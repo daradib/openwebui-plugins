@@ -90,7 +90,7 @@ def parse_arguments() -> argparse.Namespace:
         "--workers",
         type=int,
         default=None,
-        help="Number of workers to use for parsing documents",
+        help="Number of workers to use for parsing documents, generating embeddings, and saving to the vector store",
     )
     parser.add_argument(
         "--dry-run",
@@ -375,6 +375,7 @@ def build_document_store(args: argparse.Namespace) -> None:
             model_name=args.embedding_model,
             base_url=args.ollama_base_url,
             text_instruction=text_instruction,
+            num_workers=args.workers,
         )
     elif args.deepinfra_api_key:
         from llama_index.embeddings.deepinfra import DeepInfraEmbeddingModel
@@ -384,12 +385,14 @@ def build_document_store(args: argparse.Namespace) -> None:
             api_token=args.deepinfra_api_key,
             text_prefix=text_instruction + " " if text_instruction else "",
         )
+        embed_model.num_workers = args.workers
     else:
         from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
         embed_model = HuggingFaceEmbedding(
             model_name=args.embedding_model,
             text_instruction=text_instruction,
+            num_workers=args.workers,
         )
 
     # Initialize Qdrant client and vector store
@@ -467,6 +470,7 @@ def build_document_store(args: argparse.Namespace) -> None:
             [doc for doc in documents if is_document_custom_extractor(doc)],
             storage_context=storage_context,
             embed_model=embed_model,
+            use_async=bool(vector_store._aclient),
             show_progress=True,
             transformations=transformations,
         )
@@ -474,6 +478,7 @@ def build_document_store(args: argparse.Namespace) -> None:
             [doc for doc in documents if not is_document_custom_extractor(doc)],
             storage_context=storage_context,
             embed_model=embed_model,
+            use_async=bool(vector_store._aclient),
             show_progress=True,
             transformations=default_transformations,
         )
