@@ -14,7 +14,9 @@ from llama_index.core import (
     StorageContext,
     VectorStoreIndex,
 )
+from llama_index.core.constants import DEFAULT_CHUNK_SIZE
 from llama_index.core.node_parser import MarkdownNodeParser, SentenceSplitter
+from llama_index.core.utils import get_tokenizer
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient, models
 from tqdm import tqdm
@@ -318,19 +320,22 @@ def delete_nodes_by_file_paths(
 def build_document_store(args: argparse.Namespace) -> None:
     """Build or update the document store with the given arguments."""
     # Set up document parser based on output format
+    default_transformations = [SentenceSplitter()]
     if args.format == "plain":
         from llama_index.readers.file import PyMuPDFReader
 
         parser_obj = PyMuPDFReader()
         file_extractor = {".pdf": parser_obj}
-        transformations = [SentenceSplitter()]
+        transformations = default_transformations
     elif args.format == "markdown":
         from pymupdf4llm import LlamaMarkdownReader
 
         parser_obj = LlamaMarkdownReader()
         file_extractor = {".pdf": parser_obj}
-        transformations = [MarkdownNodeParser(), SentenceSplitter()]
+        transformations = [MarkdownNodeParser()] + default_transformations
     elif args.format == "json":
+        from docling.chunking import HybridChunker
+        from docling_core.transforms.chunker.tokenizer.openai import OpenAITokenizer
         from llama_index.node_parser.docling import DoclingNodeParser
         from llama_index.readers.docling import DoclingReader
 
@@ -341,7 +346,16 @@ def build_document_store(args: argparse.Namespace) -> None:
             ".xlsx": parser_obj,
             ".pptx": parser_obj,
         }
-        transformations = [DoclingNodeParser(), SentenceSplitter()]
+        transformations = [
+            DoclingNodeParser(
+                chunker=HybridChunker(
+                    tokenizer=OpenAITokenizer(
+                        tokenizer=get_tokenizer().func.__self__,
+                        max_tokens=DEFAULT_CHUNK_SIZE,
+                    ),
+                )
+            )
+        ]
     else:
         raise NotImplementedError
 
@@ -461,7 +475,7 @@ def build_document_store(args: argparse.Namespace) -> None:
             storage_context=storage_context,
             embed_model=embed_model,
             show_progress=True,
-            transformations=[SentenceSplitter()],
+            transformations=default_transformations,
         )
 
         print(f"Successfully processed {len(documents)} documents")
