@@ -94,48 +94,31 @@ python utils/build_document_store.py \
   /path/to/documents
 ```
 
-To install the required dependencies for the [build utility][build_document_store.py]:
+You can run the [build utility][build_document_store.py] with all dependencies pre-installed using Docker/Podman.
+
+Docker/Podman build:
 
 ```bash
-## Core dependencies (required)
-pip install llama-index-readers-file llama-index-vector-stores-qdrant
+# CPU variant (default)
+docker build --build-arg VARIANT=cpu -t build-document-store utils
 
-## Choose ONE dense embedding backend (required)
+# Nvidia CUDA variant
+docker build --build-arg VARIANT=cuda -t build-document-store utils
 
-### Option 1: Ollama API
-pip install llama-index-embeddings-ollama
+# AMD ROCm variant
+docker build --build-arg VARIANT=rocm -t build-document-store utils
+```
 
-### Option 2: DeepInfra API
-pip install llama-index-embeddings-deepinfra
+Docker/Podman run:
 
-### Option 3: HuggingFace SentenceTransformer
-# Skip the CPU-only torch line below if using GPU
-pip install --index-url https://download.pytorch.org/whl/cpu torch
-pip install llama-index-embeddings-huggingface
-
-## Choose ONE sparse embedding backend (required)
-
-### Option 1: CPU
-pip install fastembed
-
-### Option 2: GPU
-pip install fastembed-gpu
-
-## Choose ONE PDF extraction format
-
-### Option 1: plain text (fastest)
-pip install PyMuPDF
-
-### Option 2: Markdown (slower, higher quality)
-pip install pymupdf4llm
-
-### Option 3: JSON (slowest, highest quality)
-# Skip the CPU-only torch line below if using GPU
-pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
-pip install llama-index-readers-docling llama-index-node-parser-docling
-
-## Support for other file formats if present
-pip install docx2txt
+```bash
+docker run --rm \
+  --net host \
+  -v ./cache:/root/.cache \
+  -v ./documents:/data:ro \
+  build-document-store \
+  --qdrant-url http://localhost:6333 \
+  /data
 ```
 
 The [build utility][build_document_store.py] supports several options:

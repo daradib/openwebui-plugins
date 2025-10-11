@@ -1,0 +1,4 @@
+# Ignore everything unless specified below
+*
+
+!build_document_store.py
