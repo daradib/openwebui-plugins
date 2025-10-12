@@ -5,7 +5,7 @@ author_url: https://github.com/daradib/
 git_url: https://github.com/daradib/openwebui-plugins.git
 description: Retrieves documents from a Qdrant vector store. Supports hybrid search for agentic knowledge base RAG.
 requirements: fastembed, llama-index-embeddings-deepinfra, llama-index-embeddings-ollama, llama-index-llms-ollama, llama-index-vector-stores-qdrant
-version: 0.2.3
+version: 0.2.4
 license: AGPL-3.0-or-later
 """
 
@@ -290,7 +290,7 @@ def clean_text(text: str) -> str:
     Remove unwanted formatting and artifacts from text output.
     """
     # Remove HTML tags.
-    text = re.sub(r"<[^>]+>", "", text)
+    text = re.sub(r"<[a-zA-Z/][^>]*>", "", text)
     # Replace multiple blank lines with a single blank line.
     text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)
     # Remove lines with only whitespace.
